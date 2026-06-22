@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom ABA — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #4A90D9; --blue-light: #E8F3FC; --blue-dark: #3D5A73;
+    --coral: #FF6B6B; --coral-light: #FFF0F0;
+    --green: #6BBF7F; --green-light: #EEF8F1;
+    --gold: #F5A623; --gold-light: #FFF8EC;
+    --purple: #9B59B6; --purple-light: #F5EEF8;
+    --white: #F8FBFF; --surface: #FFFFFF; --gray: #E8F1F8;
+    --text: #2C3E50; --muted: #7F8C9A;
+    --radius: 14px;
+    --shadow: 0 2px 12px rgba(74,144,217,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--text); display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 230px; min-width: 230px; background: #1a2535;
+    display: flex; flex-direction: column; padding: 0; position: fixed;
+    top: 0; left: 0; height: 100vh; z-index: 100; overflow-y: auto;
+  }
+  .sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.10); }
+  .sidebar-logo h1 { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.4rem; color: #fff; }
+  .sidebar-logo p { color: rgba(255,255,255,0.5); font-size: 0.72rem; margin-top: 4px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .nav-section-label { padding: 18px 24px 6px; color: rgba(255,255,255,0.35); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 24px; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 0.87rem; font-weight: 500; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,0.12); color: #fff; border-left-color: var(--gold); }
+  .nav-item .icon { font-size: 1rem; width: 22px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 20px 24px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.75rem; color: rgba(255,255,255,0.35); }
+  .sidebar-footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
+
+  .main { margin-left: 230px; flex: 1; padding: 32px 36px; }
+  .page-section { display: none; }
+  .page-section.active { display: block; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .topbar-title h2 { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.7rem; color: var(--blue-dark); }
+  .topbar-title p { color: var(--muted); font-size: 0.88rem; margin-top: 2px; }
+  .admin-badge { background: #1a2535; color: #fff; padding: 8px 16px; border-radius: 50px; font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+
+  .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 26px; margin-bottom: 20px; }
+  .card-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--blue-dark); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  /* FORM ELEMENTS */
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--gray);
+    font-family: 'Inter', sans-serif; font-size: 0.88rem; background: var(--white);
+    color: var(--text); outline: none; transition: border 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--blue); }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn { padding: 10px 22px; border-radius: 50px; border: none; cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.9rem; transition: all 0.2s; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-coral { background: var(--coral); color: #fff; }
+  .btn-coral:hover { opacity: 0.88; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 0.78rem; }
+  .btn-danger { background: var(--coral); color: #fff; }
+
+  /* TABLES */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .data-table th { background: var(--blue-dark); color: #fff; padding: 10px 14px; text-align: left; font-weight: 600; }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--gray); vertical-align: top; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--blue-light); }
+  .badge { display: inline-block; border-radius: 6px; padding: 2px 10px; font-size: 0.74rem; font-weight: 700; }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
+  .badge-coral { background: var(--coral-light); color: var(--coral); }
+  .badge-green { background: var(--green-light); color: #2e8044; }
+  .badge-gold { background: var(--gold-light); color: #9a6400; }
+  .badge-new { background: var(--coral); color: #fff; font-size: 0.7rem; padding: 1px 7px; border-radius: 50px; }
+
+  /* FEEDBACK ITEMS */
+  .fb-item { border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; border-left: 4px solid var(--blue); background: var(--blue-light); }
+  .fb-item.unread { border-left-color: var(--coral); background: var(--coral-light); }
+  .fb-item .fb-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .fb-item .fb-text { font-size: 0.88rem; color: var(--text); line-height: 1.6; }
+  .fb-mark-read { background: none; border: 1.5px solid var(--blue); border-radius: 6px; padding: 3px 10px; font-size: 0.75rem; color: var(--blue); cursor: pointer; font-weight: 600; }
+
+  /* STATS */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .stat-card .stat-val { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 2rem; color: var(--blue-dark); }
+  .stat-card .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+  /* AVATAR */
+  .avatar-sm { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; color: #fff; margin-right: 8px; vertical-align: middle; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 28px; right: 28px; background: var(--green); color: #fff; padding: 14px 22px; border-radius: 12px; font-weight: 700; font-size: 0.92rem; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 9999; display: none; align-items: center; gap: 10px; }
+  .toast.show { display: flex; }
+
+  /* LOGIN */
+  .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #1a2535 0%, #3D5A73 100%); }
+  .login-box { background: var(--surface); border-radius: 20px; padding: 40px; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+  .login-box h2 { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.6rem; color: var(--blue-dark); margin-bottom: 6px; }
+  .login-box p { color: var(--muted); font-size: 0.85rem; margin-bottom: 28px; }
+  .login-box input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid var(--gray); font-size: 0.9rem; font-family: 'Inter', sans-serif; outline: none; margin-bottom: 14px; }
+  .login-box input:focus { border-color: var(--blue); }
+  .login-box .btn { width: 100%; padding: 12px; font-size: 1rem; }
+  .login-error { color: var(--coral); font-size: 0.82rem; margin-top: 10px; display: none; }
+
+  /* CALENDAR ADMIN */
+  .cal-event-list { list-style: none; }
+  .cal-event-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray); font-size: 0.88rem; }
+  .cal-event-item:last-child { border-bottom: none; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 32px; max-width: 560px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,0.2); }
+  .modal h3 { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--blue-dark); margin-bottom: 20px; }
+  .modal-close { float: right; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--gray); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen" style="width:100%;position:fixed;inset:0;z-index:9999;">
+  <div class="login-box">
+    <div style="font-size:2.5rem;margin-bottom:12px;">🌸</div>
+    <h2>Bloom ABA</h2>
+    <p>Admin Portal — Authorized Access Only</p>
+    <input type="text" id="login-user" placeholder="Username" />
+    <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+    <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / bloom2024</p>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="admin-sidebar" style="display:none;">
+  <div class="sidebar-logo">
+    <h1>🔐 Admin</h1>
+    <p>Bloom ABA Portal</p>
+  </div>
+  <div class="nav-section-label">Overview</div>
+  <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
+  <div class="nav-section-label">Manage</div>
+  <div class="nav-item" onclick="showPage('assignments')" id="nav-assignments"><span class="icon">📋</span><span>Today's Assignments</span></div>
+  <div class="nav-item" onclick="showPage('rbt-mgmt')" id="nav-rbt-mgmt"><span class="icon">👥</span><span>RBT Profiles</span></div>
+  <div class="nav-item" onclick="showPage('schedule-mgmt')" id="nav-schedule-mgmt"><span class="icon">📅</span><span>Staff Schedules</span></div>
+  <div class="nav-item" onclick="showPage('training-mgmt')" id="nav-training-mgmt"><span class="icon">🎓</span><span>Training Pairs</span></div>
+  <div class="nav-section-label">Celebrate</div>
+  <div class="nav-item" onclick="showPage('shoutouts-mgmt')" id="nav-shoutouts-mgmt"><span class="icon">⭐</span><span>Shoutouts</span></div>
+  <div class="nav-section-label">Communication</div>
+  <div class="nav-item" onclick="showPage('feedback-mgmt')" id="nav-feedback-mgmt">
+    <span class="icon">💬</span><span>Feedback</span>
+    <span class="badge-new" id="unread-badge" style="display:none;margin-left:auto;">New</span>
+  </div>
+  <div class="nav-item" onclick="showPage('timeline-mgmt')" id="nav-timeline-mgmt"><span class="icon">🕐</span><span>Daily Timeline</span></div>
+  <div class="nav-item" onclick="showPage('calendar-mgmt')" id="nav-calendar-mgmt"><span class="icon">🗓️</span><span>Team Calendar</span></div>
+  <div class="sidebar-footer">
+    <div>Logged in as <strong>Admin</strong></div>
+    <div style="margin-top:6px;"><span onclick="doLogout()" style="cursor:pointer;color:rgba(255,255,255,0.5);">Sign Out</span> · <a href="index.html" target="_blank">View Portal →</a></div>
+  </div>
+</aside>
+
+<!-- MAIN ADMIN -->
+<main class="main" id="admin-main" style="display:none;">
+
+  <!-- DASHBOARD -->
+  <section class="page-section active" id="page-dashboard">
+    <div class="topbar">
+      <div class="topbar-title"><h2>📊 Admin Dashboard</h2><p>Bloom ABA Clinic — Quick overview</p></div>
+      <div class="admin-badge">🔐 Admin</div>
+    </div>
+    <div class="stat-row" id="stat-row"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--coral)"></span>Unread Feedback</div>
+        <div id="dash-feedback"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Recent Shoutouts</div>
+        <div id="dash-shoutouts"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASSIGNMENTS -->
+  <section class="page-section" id="page-assignments">
+    <div class="topbar">
+      <div class="topbar-title"><h2>📋 Today's Assignments</h2><p>Manage who has who today</p></div>
+      <button class="btn btn-green" onclick="openModal('modal-assignment')">+ Add Assignment</button>
+    </div>
+    <div class="card">
+      <table class="data-table"><thead><tr><th>Staff</th><th>Client</th><th>Time</th><th>Location</th><th>Action</th></tr></thead>
+      <tbody id="assignment-table"></tbody></table>
+    </div>
+    <div class="card" style="background:var(--blue-light);border:1.5px solid rgba(74,144,217,0.2);">
+      <div style="font-size:0.85rem;color:var(--blue-dark);">
+        <strong>🔗 Scheduling Integration:</strong> To automatically pull assignments from your scheduling platform (e.g., CentralReach, Catalyst, Rethink), your IT admin can connect via API/webhook. The assignments above will update in real-time. <a href="#" style="color:var(--blue);font-weight:600;">Learn more about integration →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- RBT MANAGEMENT -->
+  <section class="page-section" id="page-rbt-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>👥 RBT Profiles</h2><p>Manage staff profiles and fun facts</p></div>
+      <button class="btn btn-green" onclick="openModal('modal-rbt')">+ Add RBT</button>
+    </div>
+    <div class="card">
+      <table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Hometown</th><th>Favorite Food</th><th>Actions</th></tr></thead>
+      <tbody id="rbt-table"></tbody></table>
+    </div>
+  </section>
+
+  <!-- SCHEDULE MANAGEMENT -->
+  <section class="page-section" id="page-schedule-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>📅 Staff Schedules</h2><p>Update individual staff weekly schedules</p></div>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>Select Staff Member</label>
+        <select id="sched-staff-select" onchange="renderScheduleMgmt()"></select>
+      </div>
+      <table class="data-table" id="sched-table"><thead><tr><th>Day</th><th>Start</th><th>End</th><th>Clients</th><th>Location</th><th>Action</th></tr></thead>
+      <tbody id="sched-table-body"></tbody></table>
+      <button class="btn btn-green" style="margin-top:16px;" onclick="openModal('modal-sched')">+ Add Shift</button>
+    </div>
+  </section>
+
+  <!-- TRAINING MANAGEMENT -->
+  <section class="page-section" id="page-training-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>🎓 Training Pairs</h2><p>Manage mentorship pairings</p></div>
+      <button class="btn btn-green" onclick="openModal('modal-training')">+ Add Pair</button>
+    </div>
+    <div class="card">
+      <table class="data-table"><thead><tr><th>Trainee</th><th>Mentor</th><th>Focus Area</th><th>Dates</th><th>Action</th></tr></thead>
+      <tbody id="training-table"></tbody></table>
+    </div>
+  </section>
+
+  <!-- SHOUTOUTS MANAGEMENT -->
+  <section class="page-section" id="page-shoutouts-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>⭐ Shoutouts</h2><p>Post client wins and staff recognition</p></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Client Shoutout</div>
+        <div class="form-group"><label>Client Name</label><input type="text" id="cs-name" placeholder="Client first name + last initial"></div>
+        <div class="form-group"><label>Staff Member</label><input type="text" id="cs-staff" placeholder="RBT's name"></div>
+        <div class="form-group"><label>Program Mastered / Achievement</label><input type="text" id="cs-program" placeholder="e.g. Independent Requesting"></div>
+        <div class="form-group"><label>Message</label><textarea id="cs-note" placeholder="Describe the win!"></textarea></div>
+        <button class="btn btn-green" onclick="addClientShoutout()">Post Client Shoutout</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--gold)"></span>Staff Shoutout</div>
+        <div class="form-group"><label>Recognizing</label><input type="text" id="ss-to" placeholder="Staff member's name"></div>
+        <div class="form-group"><label>From</label><input type="text" id="ss-from" placeholder="e.g. Dr. Sarah Mitchell (BCBA)"></div>
+        <div class="form-group"><label>Message</label><textarea id="ss-note" placeholder="Write your shoutout!"></textarea></div>
+        <button class="btn btn-primary" style="background:var(--gold);" onclick="addStaffShoutout()">Post Staff Shoutout</button>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:4px;">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--green)"></span>Client Shoutouts (Posted)</div>
+        <div id="cs-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--gold)"></span>Staff Shoutouts (Posted)</div>
+        <div id="ss-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEEDBACK MANAGEMENT -->
+  <section class="page-section" id="page-feedback-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>💬 Anonymous Feedback</h2><p>All submissions from staff — confidential</p></div>
+      <button class="btn btn-coral" onclick="markAllRead()">Mark All Read</button>
+    </div>
+    <div class="card" id="feedback-list"></div>
+  </section>
+
+  <!-- TIMELINE MANAGEMENT -->
+  <section class="page-section" id="page-timeline-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>🕐 Daily Timeline</h2><p>Edit today's clinical schedule</p></div>
+      <button class="btn btn-primary" onclick="saveTimeline()">Save Timeline</button>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Morning Block</div>
+        <div id="tl-morning-list"></div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="addTimelineItem('morning')">+ Add Item</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--coral)"></span>Afternoon Block</div>
+        <div id="tl-afternoon-list"></div>
+        <button class="btn btn-coral btn-sm" style="margin-top:12px;" onclick="addTimelineItem('afternoon')">+ Add Item</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--green)"></span>Notes & Reminders</div>
+      <div class="form-group">
+        <label>HTML-formatted notes (use &lt;br&gt; for line breaks, &lt;strong&gt; for bold)</label>
+        <textarea id="tl-notes-input" style="min-height:120px;font-family:monospace;font-size:0.83rem;"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALENDAR MANAGEMENT -->
+  <section class="page-section" id="page-calendar-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>🗓️ Team Calendar</h2><p>Add birthdays, outings, and potlucks</p></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Add Event</div>
+        <div class="form-group"><label>Date</label><input type="date" id="ev-date"></div>
+        <div class="form-group"><label>Event Type</label>
+          <select id="ev-type">
+            <option value="birthday">🎂 Birthday</option>
+            <option value="outing">🏞️ Team Outing</option>
+            <option value="potluck">🍲 Potluck</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Label (shown on calendar)</label><input type="text" id="ev-label" placeholder="e.g. 🎂 Mia's Birthday"></div>
+        <button class="btn btn-primary" onclick="addCalEvent()">Add to Calendar</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--coral)"></span>All Events</div>
+        <ul class="cal-event-list" id="cal-event-list"></ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-assignment" onclick="closeModalOnBg(event,'modal-assignment')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-assignment')">×</button>
+    <h3>Add Assignment</h3>
+    <div class="form-group"><label>Staff Name</label><input type="text" id="new-a-staff" placeholder="Full name"></div>
+    <div class="form-group"><label>Client Name</label><input type="text" id="new-a-client" placeholder="First name + last initial"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Time</label><input type="text" id="new-a-time" placeholder="8:00–11:00 AM"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="new-a-loc" placeholder="Center / Home / School"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="addAssignment()">Add</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-rbt" onclick="closeModalOnBg(event,'modal-rbt')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-rbt')">×</button>
+    <h3>Add / Edit RBT Profile</h3>
+    <input type="hidden" id="rbt-edit-idx" value="-1">
+    <div class="form-row">
+      <div class="form-group"><label>Full Name</label><input type="text" id="rbt-name"></div>
+      <div class="form-group"><label>Role / Experience</label><input type="text" id="rbt-role" placeholder="RBT · 2 yrs experience"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Hometown</label><input type="text" id="rbt-hometown"></div>
+      <div class="form-group"><label>College</label><input type="text" id="rbt-college"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Favorite Food</label><input type="text" id="rbt-food"></div>
+      <div class="form-group"><label>Hobbies</label><input type="text" id="rbt-hobbies"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Favorite Show</label><input type="text" id="rbt-show"></div>
+      <div class="form-group"><label>Fun Fact</label><input type="text" id="rbt-funfact"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveRBT()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-sched" onclick="closeModalOnBg(event,'modal-sched')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-sched')">×</button>
+    <h3>Add Shift</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Day</label>
+        <select id="sh-day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select>
+      </div>
+      <div class="form-group"><label>Start Time</label><input type="text" id="sh-start" placeholder="8:00 AM"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>End Time</label><input type="text" id="sh-end" placeholder="12:00 PM"></div>
+      <div class="form-group"><label>Location</label><input type="text" id="sh-loc" placeholder="Center / Home / School"></div>
+    </div>
+    <div class="form-group"><label>Client(s)</label><input type="text" id="sh-clients" placeholder="Client names, comma-separated"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="addShift()">Add Shift</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-training" onclick="closeModalOnBg(event,'modal-training')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-training')">×</button>
+    <h3>Add Training Pair</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Trainee Name</label><input type="text" id="tr-trainee"></div>
+      <div class="form-group"><label>Trainee Role</label><input type="text" id="tr-trainee-role" value="RBT"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Mentor Name</label><input type="text" id="tr-mentor"></div>
+      <div class="form-group"><label>Mentor Role</label><input type="text" id="tr-mentor-role" value="Senior RBT"></div>
+    </div>
+    <div class="form-group"><label>Focus Area</label><input type="text" id="tr-focus" placeholder="e.g. DTT implementation"></div>
+    <div class="form-group"><label>Date Range</label><input type="text" id="tr-dates" placeholder="June 1 – June 30"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="addTrainingPair()">Add Pair</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+
+<script>
+// ===================== DATA =====================
+const COLORS = ['#4A90D9','#FF6B6B','#6BBF7F','#F5A623','#9B59B6','#1ABC9C','#E67E22','#2980B9'];
+function initials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function colorFor(name) { let h=0; for(let c of name) h=(h+c.charCodeAt(0))%COLORS.length; return COLORS[h]; }
+function saveData(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+function loadData(key, def) { try { const d=localStorage.getItem(key); return d?JSON.parse(d):def; } catch { return def; } }
+function today() { return new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+const DEFAULT_ASSIGNMENTS = [
+  { staff:'Mia Torres',client:'Alex R.',time:'8:00–11:00 AM',location:'Center' },
+  { staff:'Jordan Lee',client:'Sam K.',time:'8:30–12:00 PM',location:'Home' },
+  { staff:'Casey Park',client:'Leo M.',time:'9:00–12:00 PM',location:'Center' },
+  { staff:'Riley Chen',client:'Emma S.',time:'10:00 AM–1:00 PM',location:'School' },
+  { staff:'Avery Kim',client:'Noah P.',time:'1:00–4:00 PM',location:'Center' },
+  { staff:'Devon Walsh',client:'Lily T.',time:'2:00–5:00 PM',location:'Home' },
+];
+const DEFAULT_STAFF = [
+  { name:'Mia Torres',role:'RBT · 2 yrs experience',facts:{hometown:'San Antonio, TX',college:'UT Austin',fave_food:'Tacos (always)',hobbies:'Hiking, painting',fave_show:'Ted Lasso',fun_fact:'Has 3 rescue cats 🐱'} },
+  { name:'Jordan Lee',role:'RBT · 3 yrs experience',facts:{hometown:'Portland, OR',college:'Oregon State',fave_food:'Sushi',hobbies:'Rock climbing, baking',fave_show:'The Great British Bake Off',fun_fact:'Speaks two languages fluently'} },
+  { name:'Casey Park',role:'RBT · 1 yr experience',facts:{hometown:'Chicago, IL',college:'DePaul University',fave_food:'Deep dish pizza',hobbies:'Gaming, reading sci-fi',fave_show:'Stranger Things',fun_fact:'Former competitive swimmer 🏊'} },
+  { name:'Riley Chen',role:'Senior RBT · 4 yrs experience',facts:{hometown:'San Francisco, CA',college:'UC Berkeley',fave_food:'Dim sum',hobbies:'Yoga, photography',fave_show:'Abbott Elementary',fun_fact:'Has visited 22 states'} },
+  { name:'Avery Kim',role:'RBT · 18 months experience',facts:{hometown:'Nashville, TN',college:'Vanderbilt',fave_food:'Hot chicken',hobbies:'Songwriting, running',fave_show:"Schitt's Creek",fun_fact:'Plays guitar and ukulele 🎸'} },
+  { name:'Devon Walsh',role:'RBT · 2 yrs experience',facts:{hometown:'Boston, MA',college:'Northeastern',fave_food:'Clam chowder',hobbies:'Skiing, podcasts',fave_show:'Parks & Rec',fun_fact:'Boston Celtics superfan 🏀'} },
+];
+const DEFAULT_SHOUTOUTS_CLIENT = [
+  { name:'Alex R.',staff:'Mia Torres',program:'Independent Requesting',note:'Used PECS to request a preferred item 3 times independently today — a huge milestone after weeks of practice! 🎉',date:'June 20' },
+  { name:'Emma S.',staff:'Riley Chen',program:'Joint Attention',note:'Emma made eye contact AND pointed to share a book with her RBT today. Her social engagement is blossoming! 🌱',date:'June 19' },
+];
+const DEFAULT_SHOUTOUTS_STAFF = [
+  { from:'Dr. Sarah Mitchell (BCBA)',to:'Jordan Lee',note:'Jordan went above and beyond this week — staying late to help prep materials and showing exceptional patience with a challenging session. We are so lucky to have you! 🌟',date:'June 21' },
+];
+const DEFAULT_TRAINING = [
+  { trainee:'Casey Park',trainee_role:'RBT',mentor:'Riley Chen',mentor_role:'Senior RBT',focus:'DTT implementation & data accuracy',dates:'June 10 – July 10' },
+  { trainee:'Avery Kim',trainee_role:'RBT',mentor:'Jordan Lee',mentor_role:'RBT',focus:'Natural Environment Training (NET)',dates:'June 1 – June 30' },
+];
+const DEFAULT_SCHEDULES = {
+  'Mia Torres':[{day:'Monday',start:'8:00 AM',end:'11:00 AM',clients:'Alex R.',location:'Center'},{day:'Tuesday',start:'8:00 AM',end:'12:00 PM',clients:'Alex R., Leo M.',location:'Center'},{day:'Wednesday',start:'9:00 AM',end:'1:00 PM',clients:'Alex R.',location:'Center'},{day:'Thursday',start:'8:00 AM',end:'11:00 AM',clients:'Alex R.',location:'Center'},{day:'Friday',start:'8:00 AM',end:'12:00 PM',clients:'Alex R.',location:'Center'}],
+  'Jordan Lee':[{day:'Monday',start:'8:30 AM',end:'12:00 PM',clients:'Sam K.',location:'Home'},{day:'Tuesday',start:'10:00 AM',end:'2:00 PM',clients:'Sam K.',location:'Home'},{day:'Wednesday',start:'8:30 AM',end:'12:00 PM',clients:'Sam K.',location:'Home'},{day:'Thursday',start:'1:00 PM',end:'4:00 PM',clients:'Sam K., Leo M.',location:'Center'},{day:'Friday',start:'8:30 AM',end:'12:00 PM',clients:'Sam K.',location:'Home'}],
+  'Casey Park':[{day:'Monday',start:'9:00 AM',end:'12:00 PM',clients:'Leo M.',location:'Center'},{day:'Wednesday',start:'9:00 AM',end:'1:00 PM',clients:'Leo M.',location:'Center'},{day:'Friday',start:'9:00 AM',end:'12:00 PM',clients:'Leo M.',location:'Center'}],
+  'Riley Chen':[{day:'Monday',start:'10:00 AM',end:'1:00 PM',clients:'Emma S.',location:'School'},{day:'Tuesday',start:'10:00 AM',end:'1:00 PM',clients:'Emma S.',location:'School'},{day:'Wednesday',start:'10:00 AM',end:'1:00 PM',clients:'Emma S.',location:'School'},{day:'Thursday',start:'10:00 AM',end:'1:00 PM',clients:'Emma S.',location:'School'}],
+  'Avery Kim':[{day:'Monday',start:'1:00 PM',end:'4:00 PM',clients:'Noah P.',location:'Center'},{day:'Tuesday',start:'1:00 PM',end:'4:00 PM',clients:'Noah P.',location:'Center'},{day:'Thursday',start:'1:00 PM',end:'4:30 PM',clients:'Noah P., Lily T.',location:'Center'},{day:'Friday',start:'1:00 PM',end:'4:00 PM',clients:'Noah P.',location:'Center'}],
+  'Devon Walsh':[{day:'Tuesday',start:'2:00 PM',end:'5:00 PM',clients:'Lily T.',location:'Home'},{day:'Wednesday',start:'2:00 PM',end:'5:00 PM',clients:'Lily T.',location:'Home'},{day:'Friday',start:'2:00 PM',end:'5:00 PM',clients:'Lily T.',location:'Home'}],
+};
+const DEFAULT_TIMELINE_MORNING=[{time:'7:45 AM',label:'Staff Arrival & Set-Up',sub:'Materials ready, session notes reviewed',color:'blue'},{time:'8:00 AM',label:'Morning Sessions Begin',sub:'Alex R. · Sam K. · Leo M.',color:'green'},{time:'9:00 AM',label:'Team Check-In (5 min)',sub:'Quick debrief — lobby area',color:'gold'},{time:'10:00 AM',label:'School Sessions Start',sub:'Riley → Emma S. at Lincoln Elem.',color:'blue'},{time:'11:30 AM',label:'Morning Block Wrap-Up',sub:'Data entered before break',color:'coral'},{time:'12:00 PM',label:'Lunch Break',sub:'Break room available — 30 min',color:'gold'}];
+const DEFAULT_TIMELINE_AFTERNOON=[{time:'12:30 PM',label:'BCBA Supervision (Riley & Casey)',sub:'Conference room B',color:'purple'},{time:'1:00 PM',label:'Afternoon Sessions Begin',sub:'Noah P. · Lily T. (home)',color:'green'},{time:'2:30 PM',label:'Parent Consult — Noah P.',sub:'BCBA Dr. Mitchell · Virtual',color:'blue'},{time:'4:00 PM',label:'Session Close Out',sub:'Data finalized, parent summaries',color:'coral'},{time:'5:00 PM',label:'End of Day',sub:'Clinic closes',color:'gold'}];
+const DEFAULT_TIMELINE_NOTES='📌 <strong>Reminder:</strong> Monthly training module due Friday June 27 for ALL staff.<br>📌 <strong>Heads up:</strong> Fire drill scheduled for Wednesday at 10:30 AM.<br>📌 <strong>New:</strong> Updated behavior plan for Leo M. is in the shared drive — please review before Thursday.';
+const DEFAULT_CAL_EVENTS=[{date:'2026-06-05',type:'birthday',label:"🎂 Mia's Birthday"},{date:'2026-06-14',type:'outing',label:'🏞️ Team Bowling Night'},{date:'2026-06-22',type:'birthday',label:"🎂 Devon's Birthday"},{date:'2026-06-27',type:'potluck',label:'🍲 Summer Potluck'},{date:'2026-07-04',type:'outing',label:'🎆 Holiday – Clinic Closed'},{date:'2026-07-11',type:'birthday',label:"🎂 Casey's Birthday"},{date:'2026-07-25',type:'outing',label:'🏞️ Team Escape Room'}];
+
+let assignments, staffList, shoutoutsClient, shoutoutsStaff, trainingPairs, schedules, calEvents, timelineMorning, timelineAfternoon, timelineNotes, feedback;
+
+function reloadData() {
+  assignments = loadData('bloom_assignments', DEFAULT_ASSIGNMENTS);
+  staffList = loadData('bloom_staff', DEFAULT_STAFF);
+  shoutoutsClient = loadData('bloom_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
+  shoutoutsStaff = loadData('bloom_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
+  trainingPairs = loadData('bloom_training', DEFAULT_TRAINING);
+  schedules = loadData('bloom_schedules', DEFAULT_SCHEDULES);
+  calEvents = loadData('bloom_cal_events', DEFAULT_CAL_EVENTS);
+  timelineMorning = loadData('bloom_timeline_morning', DEFAULT_TIMELINE_MORNING);
+  timelineAfternoon = loadData('bloom_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
+  timelineNotes = loadData('bloom_timeline_notes', DEFAULT_TIMELINE_NOTES);
+  feedback = loadData('bloom_feedback', []);
+}
+
+// ===================== AUTH =====================
+const ADMIN_USER = 'admin', ADMIN_PASS = 'bloom2024';
+function doLogin() {
+  const u=document.getElementById('login-user').value;
+  const p=document.getElementById('login-pass').value;
+  if(u===ADMIN_USER && p===ADMIN_PASS) {
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-sidebar').style.display='flex';
+    document.getElementById('admin-main').style.display='block';
+    renderAll();
+  } else {
+    document.getElementById('login-error').style.display='block';
+  }
+}
+function doLogout() {
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('admin-sidebar').style.display='none';
+  document.getElementById('admin-main').style.display='none';
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+}
+
+// ===================== NAVIGATION =====================
+function showPage(id) {
+  document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+}
+
+// ===================== MODALS =====================
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function closeModalOnBg(e, id) { if(e.target===document.getElementById(id)) closeModal(id); }
+
+// ===================== TOAST =====================
+function showToast(msg) {
+  const t=document.getElementById('toast'); document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ===================== RENDER ALL =====================
+function renderAll() {
+  reloadData();
+  renderDashboard();
+  renderAssignmentTable();
+  renderRBTTable();
+  renderScheduleSelect();
+  renderScheduleMgmt();
+  renderTrainingTable();
+  renderShoutoutsMgmt();
+  renderFeedback();
+  renderTimelineMgmt();
+  renderCalMgmt();
+  updateUnreadBadge();
+}
+
+// ===================== DASHBOARD =====================
+function renderDashboard() {
+  const unread = feedback.filter(f=>!f.read).length;
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card"><div class="stat-val">${assignments.length}</div><div class="stat-label">📋 Assignments Today</div></div>
+    <div class="stat-card"><div class="stat-val">${staffList.length}</div><div class="stat-label">👥 Active RBTs</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:${unread>0?'var(--coral)':'var(--green)'}">${unread}</div><div class="stat-label">💬 Unread Feedback</div></div>
+    <div class="stat-card"><div class="stat-val">${shoutoutsClient.length+shoutoutsStaff.length}</div><div class="stat-label">⭐ Shoutouts Posted</div></div>`;
+  const fb = document.getElementById('dash-feedback');
+  fb.innerHTML = feedback.filter(f=>!f.read).slice(0,3).map(f=>`
+    <div style="padding:10px;border-radius:8px;background:var(--coral-light);margin-bottom:8px;font-size:0.83rem;">
+      <strong>${f.category}</strong> · <span style="color:var(--muted)">${new Date(f.date).toLocaleDateString()}</span><br>
+      <span style="color:var(--text);margin-top:4px;display:block;">${f.text.slice(0,100)}${f.text.length>100?'…':''}</span>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:0.85rem;">No unread feedback 🎉</p>';
+  const sh = document.getElementById('dash-shoutouts');
+  sh.innerHTML = [...shoutoutsClient.slice(-2), ...shoutoutsStaff.slice(-1)].map(s=>`
+    <div style="padding:10px;border-radius:8px;background:var(--green-light);margin-bottom:8px;font-size:0.83rem;">
+      <strong>${s.name||s.to}</strong><br>
+      <span style="color:var(--muted)">${s.note.slice(0,90)}…</span>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:0.85rem;">No shoutouts yet</p>';
+}
+
+// ===================== ASSIGNMENTS =====================
+function renderAssignmentTable() {
+  document.getElementById('assignment-table').innerHTML = assignments.map((a,i)=>`
+    <tr>
+      <td><span class="avatar-sm" style="background:${colorFor(a.staff)}">${initials(a.staff)}</span>${a.staff}</td>
+      <td>${a.client}</td>
+      <td>${a.time}</td>
+      <td>${a.location}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteAssignment(${i})">Remove</button></td>
+    </tr>`).join('');
+}
+function addAssignment() {
+  const a={staff:document.getElementById('new-a-staff').value.trim(),client:document.getElementById('new-a-client').value.trim(),time:document.getElementById('new-a-time').value.trim(),location:document.getElementById('new-a-loc').value.trim()};
+  if(!a.staff||!a.client) { showToast('Please fill in staff and client names.'); return; }
+  assignments.push(a); saveData('bloom_assignments',assignments); renderAssignmentTable(); closeModal('modal-assignment'); showToast('Assignment added!');
+}
+function deleteAssignment(i) { assignments.splice(i,1); saveData('bloom_assignments',assignments); renderAssignmentTable(); showToast('Assignment removed.'); }
+
+// ===================== RBT PROFILES =====================
+function renderRBTTable() {
+  document.getElementById('rbt-table').innerHTML = staffList.map((s,i)=>`
+    <tr>
+      <td><span class="avatar-sm" style="background:${colorFor(s.name)}">${initials(s.name)}</span>${s.name}</td>
+      <td>${s.role}</td>
+      <td>${s.facts.hometown||'—'}</td>
+      <td>${s.facts.fave_food||'—'}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="editRBT(${i})" style="margin-right:6px;">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteRBT(${i})">Delete</button></td>
+    </tr>`).join('');
+}
+function editRBT(i) {
+  const s=staffList[i];
+  document.getElementById('rbt-edit-idx').value=i;
+  document.getElementById('rbt-name').value=s.name;
+  document.getElementById('rbt-role').value=s.role;
+  document.getElementById('rbt-hometown').value=s.facts.hometown||'';
+  document.getElementById('rbt-college').value=s.facts.college||'';
+  document.getElementById('rbt-food').value=s.facts.fave_food||'';
+  document.getElementById('rbt-hobbies').value=s.facts.hobbies||'';
+  document.getElementById('rbt-show').value=s.facts.fave_show||'';
+  document.getElementById('rbt-funfact').value=s.facts.fun_fact||'';
+  openModal('modal-rbt');
+}
+function saveRBT() {
+  const idx=parseInt(document.getElementById('rbt-edit-idx').value);
+  const s={name:document.getElementById('rbt-name').value.trim(),role:document.getElementById('rbt-role').value.trim(),facts:{hometown:document.getElementById('rbt-hometown').value.trim(),college:document.getElementById('rbt-college').value.trim(),fave_food:document.getElementById('rbt-food').value.trim(),hobbies:document.getElementById('rbt-hobbies').value.trim(),fave_show:document.getElementById('rbt-show').value.trim(),fun_fact:document.getElementById('rbt-funfact').value.trim()}};
+  if(!s.name) { showToast('Please enter a name.'); return; }
+  if(idx>=0) staffList[idx]=s; else staffList.push(s);
+  saveData('bloom_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
+  document.getElementById('rbt-edit-idx').value=-1; showToast('Profile saved!');
+}
+function deleteRBT(i) { if(!confirm('Delete this RBT profile?')) return; staffList.splice(i,1); saveData('bloom_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
+
+// ===================== SCHEDULES =====================
+function renderScheduleSelect() {
+  const sel=document.getElementById('sched-staff-select'); sel.innerHTML='';
+  Object.keys(schedules).forEach(name=>{
+    const o=document.createElement('option'); o.value=name; o.textContent=name; sel.appendChild(o);
+  });
+}
+function renderScheduleMgmt() {
+  const name=document.getElementById('sched-staff-select').value;
+  document.getElementById('sched-table-body').innerHTML=(schedules[name]||[]).map((r,i)=>`
+    <tr><td><strong>${r.day}</strong></td><td>${r.start}</td><td>${r.end}</td><td>${r.clients}</td><td>${r.location}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteShift('${name}',${i})">Remove</button></td></tr>`).join('');
+}
+function addShift() {
+  const name=document.getElementById('sched-staff-select').value;
+  const row={day:document.getElementById('sh-day').value,start:document.getElementById('sh-start').value.trim(),end:document.getElementById('sh-end').value.trim(),clients:document.getElementById('sh-clients').value.trim(),location:document.getElementById('sh-loc').value.trim()};
+  if(!schedules[name]) schedules[name]=[];
+  schedules[name].push(row); saveData('bloom_schedules',schedules); renderScheduleMgmt(); closeModal('modal-sched'); showToast('Shift added!');
+}
+function deleteShift(name,i) { schedules[name].splice(i,1); saveData('bloom_schedules',schedules); renderScheduleMgmt(); showToast('Shift removed.'); }
+
+// ===================== TRAINING =====================
+function renderTrainingTable() {
+  document.getElementById('training-table').innerHTML = trainingPairs.map((p,i)=>`
+    <tr>
+      <td><span class="avatar-sm" style="background:${colorFor(p.trainee)}">${initials(p.trainee)}</span>${p.trainee}</td>
+      <td><span class="avatar-sm" style="background:${colorFor(p.mentor)}">${initials(p.mentor)}</span>${p.mentor}</td>
+      <td>${p.focus}</td>
+      <td>${p.dates}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTrainingPair(${i})">Remove</button></td>
+    </tr>`).join('');
+}
+function addTrainingPair() {
+  const p={trainee:document.getElementById('tr-trainee').value.trim(),trainee_role:document.getElementById('tr-trainee-role').value.trim(),mentor:document.getElementById('tr-mentor').value.trim(),mentor_role:document.getElementById('tr-mentor-role').value.trim(),focus:document.getElementById('tr-focus').value.trim(),dates:document.getElementById('tr-dates').value.trim()};
+  if(!p.trainee||!p.mentor) { showToast('Please fill trainee and mentor names.'); return; }
+  trainingPairs.push(p); saveData('bloom_training',trainingPairs); renderTrainingTable(); closeModal('modal-training'); showToast('Training pair added!');
+}
+function deleteTrainingPair(i) { trainingPairs.splice(i,1); saveData('bloom_training',trainingPairs); renderTrainingTable(); showToast('Pair removed.'); }
+
+// ===================== SHOUTOUTS =====================
+function renderShoutoutsMgmt() {
+  document.getElementById('cs-list').innerHTML = shoutoutsClient.map((s,i)=>`
+    <div style="padding:10px;border-radius:8px;background:var(--green-light);margin-bottom:8px;font-size:0.83rem;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div><strong>${s.name}</strong> — ${s.program}<br><span style="color:var(--muted)">${s.note.slice(0,60)}…</span></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteCS(${i})">✕</button>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:0.84rem;">No shoutouts yet.</p>';
+  document.getElementById('ss-list').innerHTML = shoutoutsStaff.map((s,i)=>`
+    <div style="padding:10px;border-radius:8px;background:var(--gold-light);margin-bottom:8px;font-size:0.83rem;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div><strong>${s.to}</strong> from ${s.from}<br><span style="color:var(--muted)">${s.note.slice(0,60)}…</span></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteSS(${i})">✕</button>
+    </div>`).join('') || '<p style="color:var(--muted);font-size:0.84rem;">No shoutouts yet.</p>';
+}
+function addClientShoutout() {
+  const n=document.getElementById('cs-name').value.trim(),st=document.getElementById('cs-staff').value.trim(),pr=document.getElementById('cs-program').value.trim(),no=document.getElementById('cs-note').value.trim();
+  if(!n||!no) { showToast('Please fill in client name and message.'); return; }
+  shoutoutsClient.unshift({name:n,staff:st,program:pr,note:no,date:today()});
+  saveData('bloom_shoutouts_client',shoutoutsClient); renderShoutoutsMgmt(); renderDashboard();
+  ['cs-name','cs-staff','cs-program','cs-note'].forEach(id=>document.getElementById(id).value='');
+  showToast('Client shoutout posted! 🎉');
+}
+function addStaffShoutout() {
+  const to=document.getElementById('ss-to').value.trim(),fr=document.getElementById('ss-from').value.trim(),no=document.getElementById('ss-note').value.trim();
+  if(!to||!no) { showToast('Please fill in staff name and message.'); return; }
+  shoutoutsStaff.unshift({to,from:fr,note:no,date:today()});
+  saveData('bloom_shoutouts_staff',shoutoutsStaff); renderShoutoutsMgmt(); renderDashboard();
+  ['ss-to','ss-from','ss-note'].forEach(id=>document.getElementById(id).value='');
+  showToast('Staff shoutout posted! 🌟');
+}
+function deleteCS(i){shoutoutsClient.splice(i,1);saveData('bloom_shoutouts_client',shoutoutsClient);renderShoutoutsMgmt();}
+function deleteSS(i){shoutoutsStaff.splice(i,1);saveData('bloom_shoutouts_staff',shoutoutsStaff);renderShoutoutsMgmt();}
+
+// ===================== FEEDBACK =====================
+function renderFeedback() {
+  const el=document.getElementById('feedback-list');
+  if(!feedback.length) { el.innerHTML='<p style="color:var(--muted);font-size:0.88rem;">No feedback submitted yet.</p>'; return; }
+  el.innerHTML=feedback.slice().reverse().map((f,ri)=>{
+    const i=feedback.length-1-ri;
+    return `<div class="fb-item ${f.read?'':'unread'}">
+      <div class="fb-meta">
+        <span class="badge badge-blue">${f.category}</span>
+        <span>${new Date(f.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+        ${!f.read?'<span class="badge-new">Unread</span>':''}
+        ${!f.read?`<button class="fb-mark-read" onclick="markRead(${i})">Mark Read</button>`:''}
+      </div>
+      <div class="fb-text">${f.text}</div>
+    </div>`;
+  }).join('');
+  updateUnreadBadge();
+}
+function markRead(i) { feedback[i].read=true; saveData('bloom_feedback',feedback); renderFeedback(); renderDashboard(); }
+function markAllRead() { feedback.forEach(f=>f.read=true); saveData('bloom_feedback',feedback); renderFeedback(); renderDashboard(); showToast('All feedback marked as read.'); }
+function updateUnreadBadge() {
+  const n=feedback.filter(f=>!f.read).length;
+  const badge=document.getElementById('unread-badge');
+  badge.style.display=n>0?'inline-block':'none';
+  if(n>0) badge.textContent=n;
+}
+
+// ===================== TIMELINE =====================
+function renderTimelineMgmt() {
+  function renderBlock(items, elId) {
+    document.getElementById(elId).innerHTML = items.map((item,i)=>`
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
+        <div style="flex:1;">
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <input value="${item.time}" oninput="timelineMorning_update('${elId}',${i},'time',this.value)" style="width:90px;padding:5px 8px;border-radius:6px;border:1.5px solid var(--gray);font-size:0.8rem;">
+            <input value="${item.label}" oninput="timelineMorning_update('${elId}',${i},'label',this.value)" style="flex:1;padding:5px 8px;border-radius:6px;border:1.5px solid var(--gray);font-size:0.8rem;">
+          </div>
+          <input value="${item.sub}" oninput="timelineMorning_update('${elId}',${i},'sub',this.value)" style="width:100%;padding:5px 8px;border-radius:6px;border:1.5px solid var(--gray);font-size:0.78rem;color:var(--muted);">
+        </div>
+        <button onclick="deleteTLItem('${elId}',${i})" style="background:none;border:none;color:var(--coral);cursor:pointer;font-size:1.1rem;margin-top:4px;">✕</button>
+      </div>`).join('');
+  }
+  renderBlock(timelineMorning,'tl-morning-list');
+  renderBlock(timelineAfternoon,'tl-afternoon-list');
+  document.getElementById('tl-notes-input').value=timelineNotes;
+}
+function timelineMorning_update(block,i,field,val){
+  if(block==='tl-morning-list') timelineMorning[i][field]=val;
+  else timelineAfternoon[i][field]=val;
+}
+function addTimelineItem(block){
+  const item={time:'12:00 PM',label:'New Item',sub:'Details here',color:'blue'};
+  if(block==='morning') timelineMorning.push(item); else timelineAfternoon.push(item);
+  renderTimelineMgmt();
+}
+function deleteTLItem(block,i){
+  if(block==='tl-morning-list') timelineMorning.splice(i,1); else timelineAfternoon.splice(i,1);
+  renderTimelineMgmt();
+}
+function saveTimeline(){
+  timelineNotes=document.getElementById('tl-notes-input').value;
+  saveData('bloom_timeline_morning',timelineMorning);
+  saveData('bloom_timeline_afternoon',timelineAfternoon);
+  saveData('bloom_timeline_notes',timelineNotes);
+  showToast('Timeline saved!');
+}
+
+// ===================== CALENDAR =====================
+function renderCalMgmt() {
+  document.getElementById('cal-event-list').innerHTML=calEvents.sort((a,b)=>a.date.localeCompare(b.date)).map((e,i)=>`
+    <li class="cal-event-item">
+      <div><strong>${e.date}</strong> — ${e.label}</div>
+      <button class="btn btn-danger btn-sm" onclick="deleteCalEvent(${i})">✕</button>
+    </li>`).join('') || '<li style="color:var(--muted);font-size:0.85rem;padding:10px 0;">No events yet.</li>';
+}
+function addCalEvent(){
+  const date=document.getElementById('ev-date').value,type=document.getElementById('ev-type').value,label=document.getElementById('ev-label').value.trim();
+  if(!date||!label) { showToast('Please fill in date and label.'); return; }
+  calEvents.push({date,type,label}); saveData('bloom_cal_events',calEvents); renderCalMgmt();
+  document.getElementById('ev-date').value=''; document.getElementById('ev-label').value='';
+  showToast('Event added to calendar!');
+}
+function deleteCalEvent(i){calEvents.splice(i,1);saveData('bloom_cal_events',calEvents);renderCalMgmt();}
+
+// ===================== INIT =====================
+// Don't auto-render — only after login
+</script>
+</body>
+</html>
