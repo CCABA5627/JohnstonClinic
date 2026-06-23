@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bloom ABA — Staff Portal</title>
+<title>Circle City ABA — Staff Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -336,7 +336,7 @@
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h1>🌸 Bloom ABA</h1>
+    <h1>🌀 Circle City ABA</h1>
     <p>Staff Portal</p>
   </div>
   <div class="nav-section-label">Daily</div>
@@ -368,7 +368,7 @@
     <span class="icon">🗓️</span><span>Team Calendar</span>
   </div>
   <div class="sidebar-footer">
-    <div>Bloom ABA Clinic</div>
+    <div>Circle City ABA Clinic</div>
     <div style="margin-top:4px"><a href="admin.html" style="color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.72rem;">Admin Access →</a></div>
   </div>
 </aside>
@@ -712,16 +712,16 @@ const DEFAULT_CALENDAR_EVENTS = [
 // ===================== STATE =====================
 let calYear = 2026, calMonth = 5; // 0-indexed
 let selectedStaff = null;
-let assignments = loadData('bloom_assignments', DEFAULT_ASSIGNMENTS);
-let staffList = loadData('bloom_staff', DEFAULT_STAFF);
-let shoutoutsClient = loadData('bloom_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
-let shoutoutsStaff = loadData('bloom_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
-let trainingPairs = loadData('bloom_training', DEFAULT_TRAINING);
-let schedules = loadData('bloom_schedules', DEFAULT_SCHEDULES);
-let calEvents = loadData('bloom_cal_events', DEFAULT_CALENDAR_EVENTS);
-let timelineMorning = loadData('bloom_timeline_morning', DEFAULT_TIMELINE_MORNING);
-let timelineAfternoon = loadData('bloom_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
-let timelineNotes = loadData('bloom_timeline_notes', DEFAULT_TIMELINE_NOTES);
+let assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+let staffList = loadData('cc_staff', DEFAULT_STAFF);
+let shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
+let shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
+let trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
+let schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+let calEvents = loadData('cc_cal_events', DEFAULT_CALENDAR_EVENTS);
+let timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
+let timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
+let timelineNotes = loadData('cc_timeline_notes', DEFAULT_TIMELINE_NOTES);
 
 // ===================== NAVIGATION =====================
 function showPage(id) {
@@ -902,9 +902,9 @@ function submitFeedback() {
   const text = document.getElementById('fb-text').value.trim();
   if(!cat) { showToast('Please select a category.', true); return; }
   if(!text) { showToast('Please enter your feedback.', true); return; }
-  const existing = loadData('bloom_feedback', []);
+  const existing = loadData('cc_feedback', []);
   existing.push({ category: cat, text, date: new Date().toISOString(), read: false });
-  localStorage.setItem('bloom_feedback', JSON.stringify(existing));
+  localStorage.setItem('cc_feedback', JSON.stringify(existing));
   document.getElementById('fb-category').value = '';
   document.getElementById('fb-text').value = '';
   showToast('Feedback submitted anonymously! Thank you. 💙');
@@ -966,17 +966,17 @@ function init() {
   renderCalendar();
   // Listen for storage changes from admin
   window.addEventListener('storage', (e) => {
-    if(e.key && e.key.startsWith('bloom_')) {
-      assignments = loadData('bloom_assignments', DEFAULT_ASSIGNMENTS);
-      staffList = loadData('bloom_staff', DEFAULT_STAFF);
-      shoutoutsClient = loadData('bloom_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
-      shoutoutsStaff = loadData('bloom_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
-      trainingPairs = loadData('bloom_training', DEFAULT_TRAINING);
-      schedules = loadData('bloom_schedules', DEFAULT_SCHEDULES);
-      calEvents = loadData('bloom_cal_events', DEFAULT_CALENDAR_EVENTS);
-      timelineMorning = loadData('bloom_timeline_morning', DEFAULT_TIMELINE_MORNING);
-      timelineAfternoon = loadData('bloom_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
-      timelineNotes = loadData('bloom_timeline_notes', DEFAULT_TIMELINE_NOTES);
+    if(e.key && e.key.startsWith('cc_')) {
+      assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+      staffList = loadData('cc_staff', DEFAULT_STAFF);
+      shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
+      shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
+      trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
+      schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+      calEvents = loadData('cc_cal_events', DEFAULT_CALENDAR_EVENTS);
+      timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
+      timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
+      timelineNotes = loadData('cc_timeline_notes', DEFAULT_TIMELINE_NOTES);
       renderToday(); renderTimeline(); renderStaff();
       renderSchedules(); renderTraining(); renderShoutouts(); renderCalendar();
     }
