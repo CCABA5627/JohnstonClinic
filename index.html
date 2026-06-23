@@ -387,10 +387,10 @@
     </div>
     <div class="sync-banner">
       <div>
-        <h4>🔗 Schedule Sync Active</h4>
-        <p>Assignments pulled from your scheduling system. Last updated: <span id="sync-time"></span></p>
+        <h4>🔗 PodScheduler Sync</h4>
+        <p>Assignments pulled live from PodScheduler. Last updated: <span id="sync-time">—</span></p>
       </div>
-      <div class="sync-pill">✓ Connected</div>
+      <div class="sync-pill" id="sync-status">Connecting...</div>
     </div>
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Today's Assignments</div>
@@ -709,6 +709,32 @@ const DEFAULT_CALENDAR_EVENTS = [
   { date: '2026-07-25', type: 'outing', label: '🏞️ Team Escape Room' },
 ];
 
+// ===================== SUPABASE =====================
+const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
+
+async function fetchAssignmentsFromSupabase() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/assignments?date=eq.${today}&order=created_at.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      assignments = data.map(r => ({ staff: r.staff, client: r.client, time: r.time, location: r.location }));
+      document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('sync-status').textContent = '✓ Live from PodScheduler';
+      document.getElementById('sync-status').style.background = 'rgba(107,191,127,0.25)';
+    } else {
+      document.getElementById('sync-status').textContent = '— No assignments pushed yet for today';
+    }
+    renderToday();
+  } catch(e) {
+    document.getElementById('sync-status').textContent = '⚠ Could not connect to database';
+    renderToday();
+  }
+}
+
 // ===================== STATE =====================
 let calYear = 2026, calMonth = 5; // 0-indexed
 let selectedStaff = null;
@@ -957,7 +983,8 @@ function showToast(msg, isErr) {
 
 // ===================== INIT =====================
 function init() {
-  renderToday();
+  fetchAssignmentsFromSupabase();
+  setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000); // auto-refresh every 5 min
   renderTimeline();
   renderStaff();
   renderSchedules();
