@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bloom ABA — Admin Panel</title>
+<title>Circle City ABA — Admin Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -135,14 +135,14 @@
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="login-screen" style="width:100%;position:fixed;inset:0;z-index:9999;">
   <div class="login-box">
-    <div style="font-size:2.5rem;margin-bottom:12px;">🌸</div>
-    <h2>Bloom ABA</h2>
+    <div style="font-size:2.5rem;margin-bottom:12px;">🌀</div>
+    <h2>Circle City ABA</h2>
     <p>Admin Portal — Authorized Access Only</p>
     <input type="text" id="login-user" placeholder="Username" />
     <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
-    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / bloom2024</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
   </div>
 </div>
 
@@ -150,7 +150,7 @@
 <aside class="sidebar" id="admin-sidebar" style="display:none;">
   <div class="sidebar-logo">
     <h1>🔐 Admin</h1>
-    <p>Bloom ABA Portal</p>
+    <p>Circle City ABA Portal</p>
   </div>
   <div class="nav-section-label">Overview</div>
   <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
@@ -180,7 +180,7 @@
   <!-- DASHBOARD -->
   <section class="page-section active" id="page-dashboard">
     <div class="topbar">
-      <div class="topbar-title"><h2>📊 Admin Dashboard</h2><p>Bloom ABA Clinic — Quick overview</p></div>
+      <div class="topbar-title"><h2>📊 Admin Dashboard</h2><p>Circle City ABA Clinic — Quick overview</p></div>
       <div class="admin-badge">🔐 Admin</div>
     </div>
     <div class="stat-row" id="stat-row"></div>
@@ -484,21 +484,21 @@ const DEFAULT_CAL_EVENTS=[{date:'2026-06-05',type:'birthday',label:"🎂 Mia's B
 let assignments, staffList, shoutoutsClient, shoutoutsStaff, trainingPairs, schedules, calEvents, timelineMorning, timelineAfternoon, timelineNotes, feedback;
 
 function reloadData() {
-  assignments = loadData('bloom_assignments', DEFAULT_ASSIGNMENTS);
-  staffList = loadData('bloom_staff', DEFAULT_STAFF);
-  shoutoutsClient = loadData('bloom_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
-  shoutoutsStaff = loadData('bloom_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
-  trainingPairs = loadData('bloom_training', DEFAULT_TRAINING);
-  schedules = loadData('bloom_schedules', DEFAULT_SCHEDULES);
-  calEvents = loadData('bloom_cal_events', DEFAULT_CAL_EVENTS);
-  timelineMorning = loadData('bloom_timeline_morning', DEFAULT_TIMELINE_MORNING);
-  timelineAfternoon = loadData('bloom_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
-  timelineNotes = loadData('bloom_timeline_notes', DEFAULT_TIMELINE_NOTES);
-  feedback = loadData('bloom_feedback', []);
+  assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+  staffList = loadData('cc_staff', DEFAULT_STAFF);
+  shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
+  shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
+  trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
+  schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+  calEvents = loadData('cc_cal_events', DEFAULT_CAL_EVENTS);
+  timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
+  timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
+  timelineNotes = loadData('cc_timeline_notes', DEFAULT_TIMELINE_NOTES);
+  feedback = loadData('cc_feedback', []);
 }
 
 // ===================== AUTH =====================
-const ADMIN_USER = 'admin', ADMIN_PASS = 'bloom2024';
+const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
@@ -590,9 +590,9 @@ function renderAssignmentTable() {
 function addAssignment() {
   const a={staff:document.getElementById('new-a-staff').value.trim(),client:document.getElementById('new-a-client').value.trim(),time:document.getElementById('new-a-time').value.trim(),location:document.getElementById('new-a-loc').value.trim()};
   if(!a.staff||!a.client) { showToast('Please fill in staff and client names.'); return; }
-  assignments.push(a); saveData('bloom_assignments',assignments); renderAssignmentTable(); closeModal('modal-assignment'); showToast('Assignment added!');
+  assignments.push(a); saveData('cc_assignments',assignments); renderAssignmentTable(); closeModal('modal-assignment'); showToast('Assignment added!');
 }
-function deleteAssignment(i) { assignments.splice(i,1); saveData('bloom_assignments',assignments); renderAssignmentTable(); showToast('Assignment removed.'); }
+function deleteAssignment(i) { assignments.splice(i,1); saveData('cc_assignments',assignments); renderAssignmentTable(); showToast('Assignment removed.'); }
 
 // ===================== RBT PROFILES =====================
 function renderRBTTable() {
@@ -623,10 +623,10 @@ function saveRBT() {
   const s={name:document.getElementById('rbt-name').value.trim(),role:document.getElementById('rbt-role').value.trim(),facts:{hometown:document.getElementById('rbt-hometown').value.trim(),college:document.getElementById('rbt-college').value.trim(),fave_food:document.getElementById('rbt-food').value.trim(),hobbies:document.getElementById('rbt-hobbies').value.trim(),fave_show:document.getElementById('rbt-show').value.trim(),fun_fact:document.getElementById('rbt-funfact').value.trim()}};
   if(!s.name) { showToast('Please enter a name.'); return; }
   if(idx>=0) staffList[idx]=s; else staffList.push(s);
-  saveData('bloom_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
+  saveData('cc_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
   document.getElementById('rbt-edit-idx').value=-1; showToast('Profile saved!');
 }
-function deleteRBT(i) { if(!confirm('Delete this RBT profile?')) return; staffList.splice(i,1); saveData('bloom_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
+function deleteRBT(i) { if(!confirm('Delete this RBT profile?')) return; staffList.splice(i,1); saveData('cc_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
 
 // ===================== SCHEDULES =====================
 function renderScheduleSelect() {
@@ -645,9 +645,9 @@ function addShift() {
   const name=document.getElementById('sched-staff-select').value;
   const row={day:document.getElementById('sh-day').value,start:document.getElementById('sh-start').value.trim(),end:document.getElementById('sh-end').value.trim(),clients:document.getElementById('sh-clients').value.trim(),location:document.getElementById('sh-loc').value.trim()};
   if(!schedules[name]) schedules[name]=[];
-  schedules[name].push(row); saveData('bloom_schedules',schedules); renderScheduleMgmt(); closeModal('modal-sched'); showToast('Shift added!');
+  schedules[name].push(row); saveData('cc_schedules',schedules); renderScheduleMgmt(); closeModal('modal-sched'); showToast('Shift added!');
 }
-function deleteShift(name,i) { schedules[name].splice(i,1); saveData('bloom_schedules',schedules); renderScheduleMgmt(); showToast('Shift removed.'); }
+function deleteShift(name,i) { schedules[name].splice(i,1); saveData('cc_schedules',schedules); renderScheduleMgmt(); showToast('Shift removed.'); }
 
 // ===================== TRAINING =====================
 function renderTrainingTable() {
@@ -663,9 +663,9 @@ function renderTrainingTable() {
 function addTrainingPair() {
   const p={trainee:document.getElementById('tr-trainee').value.trim(),trainee_role:document.getElementById('tr-trainee-role').value.trim(),mentor:document.getElementById('tr-mentor').value.trim(),mentor_role:document.getElementById('tr-mentor-role').value.trim(),focus:document.getElementById('tr-focus').value.trim(),dates:document.getElementById('tr-dates').value.trim()};
   if(!p.trainee||!p.mentor) { showToast('Please fill trainee and mentor names.'); return; }
-  trainingPairs.push(p); saveData('bloom_training',trainingPairs); renderTrainingTable(); closeModal('modal-training'); showToast('Training pair added!');
+  trainingPairs.push(p); saveData('cc_training',trainingPairs); renderTrainingTable(); closeModal('modal-training'); showToast('Training pair added!');
 }
-function deleteTrainingPair(i) { trainingPairs.splice(i,1); saveData('bloom_training',trainingPairs); renderTrainingTable(); showToast('Pair removed.'); }
+function deleteTrainingPair(i) { trainingPairs.splice(i,1); saveData('cc_training',trainingPairs); renderTrainingTable(); showToast('Pair removed.'); }
 
 // ===================== SHOUTOUTS =====================
 function renderShoutoutsMgmt() {
@@ -684,7 +684,7 @@ function addClientShoutout() {
   const n=document.getElementById('cs-name').value.trim(),st=document.getElementById('cs-staff').value.trim(),pr=document.getElementById('cs-program').value.trim(),no=document.getElementById('cs-note').value.trim();
   if(!n||!no) { showToast('Please fill in client name and message.'); return; }
   shoutoutsClient.unshift({name:n,staff:st,program:pr,note:no,date:today()});
-  saveData('bloom_shoutouts_client',shoutoutsClient); renderShoutoutsMgmt(); renderDashboard();
+  saveData('cc_shoutouts_client',shoutoutsClient); renderShoutoutsMgmt(); renderDashboard();
   ['cs-name','cs-staff','cs-program','cs-note'].forEach(id=>document.getElementById(id).value='');
   showToast('Client shoutout posted! 🎉');
 }
@@ -692,12 +692,12 @@ function addStaffShoutout() {
   const to=document.getElementById('ss-to').value.trim(),fr=document.getElementById('ss-from').value.trim(),no=document.getElementById('ss-note').value.trim();
   if(!to||!no) { showToast('Please fill in staff name and message.'); return; }
   shoutoutsStaff.unshift({to,from:fr,note:no,date:today()});
-  saveData('bloom_shoutouts_staff',shoutoutsStaff); renderShoutoutsMgmt(); renderDashboard();
+  saveData('cc_shoutouts_staff',shoutoutsStaff); renderShoutoutsMgmt(); renderDashboard();
   ['ss-to','ss-from','ss-note'].forEach(id=>document.getElementById(id).value='');
   showToast('Staff shoutout posted! 🌟');
 }
-function deleteCS(i){shoutoutsClient.splice(i,1);saveData('bloom_shoutouts_client',shoutoutsClient);renderShoutoutsMgmt();}
-function deleteSS(i){shoutoutsStaff.splice(i,1);saveData('bloom_shoutouts_staff',shoutoutsStaff);renderShoutoutsMgmt();}
+function deleteCS(i){shoutoutsClient.splice(i,1);saveData('cc_shoutouts_client',shoutoutsClient);renderShoutoutsMgmt();}
+function deleteSS(i){shoutoutsStaff.splice(i,1);saveData('cc_shoutouts_staff',shoutoutsStaff);renderShoutoutsMgmt();}
 
 // ===================== FEEDBACK =====================
 function renderFeedback() {
@@ -717,8 +717,8 @@ function renderFeedback() {
   }).join('');
   updateUnreadBadge();
 }
-function markRead(i) { feedback[i].read=true; saveData('bloom_feedback',feedback); renderFeedback(); renderDashboard(); }
-function markAllRead() { feedback.forEach(f=>f.read=true); saveData('bloom_feedback',feedback); renderFeedback(); renderDashboard(); showToast('All feedback marked as read.'); }
+function markRead(i) { feedback[i].read=true; saveData('cc_feedback',feedback); renderFeedback(); renderDashboard(); }
+function markAllRead() { feedback.forEach(f=>f.read=true); saveData('cc_feedback',feedback); renderFeedback(); renderDashboard(); showToast('All feedback marked as read.'); }
 function updateUnreadBadge() {
   const n=feedback.filter(f=>!f.read).length;
   const badge=document.getElementById('unread-badge');
@@ -760,9 +760,9 @@ function deleteTLItem(block,i){
 }
 function saveTimeline(){
   timelineNotes=document.getElementById('tl-notes-input').value;
-  saveData('bloom_timeline_morning',timelineMorning);
-  saveData('bloom_timeline_afternoon',timelineAfternoon);
-  saveData('bloom_timeline_notes',timelineNotes);
+  saveData('cc_timeline_morning',timelineMorning);
+  saveData('cc_timeline_afternoon',timelineAfternoon);
+  saveData('cc_timeline_notes',timelineNotes);
   showToast('Timeline saved!');
 }
 
@@ -777,11 +777,11 @@ function renderCalMgmt() {
 function addCalEvent(){
   const date=document.getElementById('ev-date').value,type=document.getElementById('ev-type').value,label=document.getElementById('ev-label').value.trim();
   if(!date||!label) { showToast('Please fill in date and label.'); return; }
-  calEvents.push({date,type,label}); saveData('bloom_cal_events',calEvents); renderCalMgmt();
+  calEvents.push({date,type,label}); saveData('cc_cal_events',calEvents); renderCalMgmt();
   document.getElementById('ev-date').value=''; document.getElementById('ev-label').value='';
   showToast('Event added to calendar!');
 }
-function deleteCalEvent(i){calEvents.splice(i,1);saveData('bloom_cal_events',calEvents);renderCalMgmt();}
+function deleteCalEvent(i){calEvents.splice(i,1);saveData('cc_cal_events',calEvents);renderCalMgmt();}
 
 // ===================== INIT =====================
 // Don't auto-render — only after login
