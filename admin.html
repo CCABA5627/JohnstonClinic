@@ -387,14 +387,18 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label>Hometown</label><input type="text" id="rbt-hometown"></div>
-      <div class="form-group"><label>College</label><input type="text" id="rbt-college"></div>
+      <div class="form-group"><label>Favorite Food</label><input type="text" id="rbt-food"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Favorite Food</label><input type="text" id="rbt-food"></div>
+      <div class="form-group"><label>Favorite Dessert/Snack</label><input type="text" id="rbt-dessert" placeholder="e.g. Chocolate cake"></div>
       <div class="form-group"><label>Hobbies</label><input type="text" id="rbt-hobbies"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Favorite Show</label><input type="text" id="rbt-show"></div>
+      <div class="form-group"><label>Favorite Show/Movie</label><input type="text" id="rbt-show" placeholder="e.g. Ted Lasso"></div>
+      <div class="form-group"><label>Favorite Artist/Song</label><input type="text" id="rbt-artist" placeholder="e.g. Taylor Swift"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Favorite Color</label><input type="text" id="rbt-color" placeholder="e.g. Blue"></div>
       <div class="form-group"><label>Fun Fact</label><input type="text" id="rbt-funfact"></div>
     </div>
     <div class="modal-actions">
@@ -651,16 +655,18 @@ function editRBT(i) {
   document.getElementById('rbt-name').value=s.name;
   document.getElementById('rbt-role').value=s.role;
   document.getElementById('rbt-hometown').value=s.facts.hometown||'';
-  document.getElementById('rbt-college').value=s.facts.college||'';
   document.getElementById('rbt-food').value=s.facts.fave_food||'';
+  document.getElementById('rbt-dessert').value=s.facts.fave_dessert||'';
   document.getElementById('rbt-hobbies').value=s.facts.hobbies||'';
   document.getElementById('rbt-show').value=s.facts.fave_show||'';
+  document.getElementById('rbt-artist').value=s.facts.fave_artist||'';
+  document.getElementById('rbt-color').value=s.facts.fave_color||'';
   document.getElementById('rbt-funfact').value=s.facts.fun_fact||'';
   openModal('modal-rbt');
 }
 function saveRBT() {
   const idx=parseInt(document.getElementById('rbt-edit-idx').value);
-  const s={name:document.getElementById('rbt-name').value.trim(),role:document.getElementById('rbt-role').value.trim(),facts:{hometown:document.getElementById('rbt-hometown').value.trim(),college:document.getElementById('rbt-college').value.trim(),fave_food:document.getElementById('rbt-food').value.trim(),hobbies:document.getElementById('rbt-hobbies').value.trim(),fave_show:document.getElementById('rbt-show').value.trim(),fun_fact:document.getElementById('rbt-funfact').value.trim()}};
+  const s={name:document.getElementById('rbt-name').value.trim(),role:document.getElementById('rbt-role').value.trim(),facts:{hometown:document.getElementById('rbt-hometown').value.trim(),fave_food:document.getElementById('rbt-food').value.trim(),fave_dessert:document.getElementById('rbt-dessert').value.trim(),hobbies:document.getElementById('rbt-hobbies').value.trim(),fave_show:document.getElementById('rbt-show').value.trim(),fave_artist:document.getElementById('rbt-artist').value.trim(),fave_color:document.getElementById('rbt-color').value.trim(),fun_fact:document.getElementById('rbt-funfact').value.trim()}};
   if(!s.name) { showToast('Please enter a name.'); return; }
   if(idx>=0) staffList[idx]=s; else staffList.push(s);
   saveData('cc_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
