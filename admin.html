@@ -142,7 +142,7 @@
     <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
-    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Username: admin</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
   </div>
 </div>
 
@@ -168,6 +168,7 @@
   </div>
   <div class="nav-item" onclick="showPage('timeline-mgmt')" id="nav-timeline-mgmt"><span class="icon">🕐</span><span>Daily Timeline</span></div>
   <div class="nav-item" onclick="showPage('calendar-mgmt')" id="nav-calendar-mgmt"><span class="icon">🗓️</span><span>Team Calendar</span></div>
+  <div class="nav-item" onclick="showPage('reminders-mgmt')" id="nav-reminders-mgmt"><span class="icon">📌</span><span>Reminders</span></div>
   <div class="sidebar-footer">
     <div>Logged in as <strong>Admin</strong></div>
     <div style="margin-top:6px;"><span onclick="doLogout()" style="cursor:pointer;color:rgba(255,255,255,0.5);">Sign Out</span> · <a href="index.html" target="_blank">View Portal →</a></div>
@@ -351,6 +352,15 @@
 
 </main>
 
+  <!-- REMINDERS MANAGEMENT -->
+  <section class="page-section" id="page-reminders-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>📌 Reminders</h2><p>Add and manage clinic rules and guidelines</p></div>
+      <button class="btn btn-green" onclick="openModal('modal-reminder')">+ Add Reminder Card</button>
+    </div>
+    <div class="grid-2" id="reminders-admin-grid"></div>
+  </section>
+
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-assignment" onclick="closeModalOnBg(event,'modal-assignment')">
   <div class="modal">
@@ -430,6 +440,28 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-reminder" onclick="closeModalOnBg(event,'modal-reminder')">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-reminder')">×</button>
+    <h3>Add Reminder Card</h3>
+    <input type="hidden" id="reminder-edit-idx" value="-1">
+    <div class="form-group"><label>Card Title</label><input type="text" id="rem-title" placeholder="e.g. 🌳 Outside Play Rules"></div>
+    <div class="form-group"><label>Accent Color</label>
+      <select id="rem-color">
+        <option value="var(--blue)">Blue</option>
+        <option value="var(--green)">Green</option>
+        <option value="var(--coral)">Coral</option>
+        <option value="var(--gold)">Gold</option>
+        <option value="var(--purple)">Purple</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Rules / Items (one per line)</label>
+      <textarea id="rem-items" style="min-height:140px;" placeholder="Always have a staff member present outside&#10;Check playground equipment before use&#10;No running near the parking lot"></textarea>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="saveReminder()">Save Card</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
@@ -438,6 +470,12 @@ const COLORS = ['#4A90D9','#FF6B6B','#6BBF7F','#F5A623','#9B59B6','#1ABC9C','#E6
 function initials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
 function colorFor(name) { let h=0; for(let c of name) h=(h+c.charCodeAt(0))%COLORS.length; return COLORS[h]; }
 function saveData(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+const DEFAULT_REMINDERS = [
+  { title: '🌳 Outside Play Rules', color: 'var(--green)', items: ['Always have a staff member present outside', 'Check playground equipment before use', 'No running near the parking lot', 'Apply sunscreen if outside 30+ min'] },
+  { title: '👥 Group Time Rules', color: 'var(--blue)', items: ['Begin with a greeting activity', 'Use visual supports and schedules', 'Reinforce appropriate social behaviors immediately', 'Maximum 4 clients per group unless BCBA approved'] },
+];
+let reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
 function loadData(key, def) { try { const d=localStorage.getItem(key); return d?JSON.parse(d):def; } catch { return def; } }
 function today() { return new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 
@@ -498,7 +536,7 @@ function reloadData() {
 }
 
 // ===================== AUTH =====================
-const ADMIN_USER = 'admin', ADMIN_PASS = 'Roundknot5627!';
+const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
@@ -541,6 +579,7 @@ function showToast(msg) {
 // ===================== RENDER ALL =====================
 function renderAll() {
   reloadData();
+  reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
   renderDashboard();
   renderAssignmentTable();
   renderRBTTable();
@@ -551,6 +590,7 @@ function renderAll() {
   renderFeedback();
   renderTimelineMgmt();
   renderCalMgmt();
+  renderRemindersMgmt();
   updateUnreadBadge();
 }
 
@@ -782,6 +822,67 @@ function addCalEvent(){
   showToast('Event added to calendar!');
 }
 function deleteCalEvent(i){calEvents.splice(i,1);saveData('cc_cal_events',calEvents);renderCalMgmt();}
+
+function renderRemindersMgmt() {
+  const grid = document.getElementById('reminders-admin-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!reminders.length) {
+    grid.innerHTML = '<p style="color:var(--muted);font-size:0.88rem;grid-column:1/-1;">No reminder cards yet. Click "+ Add Reminder Card" to create one.</p>';
+    return;
+  }
+  reminders.forEach((r,i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.borderTop = `4px solid ${r.color||'var(--blue)'}`;
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+        <div class="card-title" style="margin-bottom:0;">${r.title}</div>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px;">
+          <button class="btn btn-primary btn-sm" onclick="editReminder(${i})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteReminder(${i})">Delete</button>
+        </div>
+      </div>
+      <ul style="padding-left:18px;display:flex;flex-direction:column;gap:6px;">
+        ${(r.items||[]).map(item=>`<li style="font-size:0.85rem;line-height:1.6;color:var(--text);">${item}</li>`).join('')}
+      </ul>`;
+    grid.appendChild(card);
+  });
+}
+
+function editReminder(i) {
+  const r = reminders[i];
+  document.getElementById('reminder-edit-idx').value = i;
+  document.getElementById('rem-title').value = r.title;
+  document.getElementById('rem-color').value = r.color || 'var(--blue)';
+  document.getElementById('rem-items').value = (r.items||[]).join('\n');
+  openModal('modal-reminder');
+}
+
+function saveReminder() {
+  const idx = parseInt(document.getElementById('reminder-edit-idx').value);
+  const title = document.getElementById('rem-title').value.trim();
+  const color = document.getElementById('rem-color').value;
+  const itemsRaw = document.getElementById('rem-items').value.trim();
+  if(!title) { showToast('Please enter a title.'); return; }
+  const items = itemsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const r = { title, color, items };
+  if(idx >= 0) reminders[idx] = r;
+  else reminders.push(r);
+  saveData('cc_reminders', reminders);
+  renderRemindersMgmt();
+  closeModal('modal-reminder');
+  document.getElementById('reminder-edit-idx').value = '-1';
+  showToast('Reminder card saved!');
+}
+
+function deleteReminder(i) {
+  if(!confirm('Delete this reminder card?')) return;
+  reminders.splice(i, 1);
+  saveData('cc_reminders', reminders);
+  renderRemindersMgmt();
+  showToast('Reminder deleted.');
+}
 
 // ===================== INIT =====================
 // Don't auto-render — only after login
