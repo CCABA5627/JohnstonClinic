@@ -118,8 +118,14 @@
   .assignment-card .time-badge {
     display: inline-block; background: var(--blue); color: #fff;
     border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600;
-    margin-top: 8px;
+    white-space: nowrap; flex-shrink: 0;
   }
+  .sessions-list { display: flex; flex-direction: column; gap: 8px; }
+  .session-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(74,144,217,0.07); border-radius: 8px; padding: 6px 8px;
+  }
+  .session-row .client-name { margin-top: 0; flex: 1; }
   .avatar-circle {
     width: 42px; height: 42px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -761,17 +767,30 @@ function showPage(id) {
 function renderToday() {
   const grid = document.getElementById('assignment-grid');
   grid.innerHTML = '';
+
+  // Group assignments by staff name
+  const grouped = {};
   assignments.forEach(a => {
+    if (!grouped[a.staff]) grouped[a.staff] = { staff: a.staff, location: a.location, sessions: [] };
+    grouped[a.staff].sessions.push({ client: a.client, time: a.time });
+  });
+
+  Object.values(grouped).forEach(g => {
     const div = document.createElement('div');
     div.className = 'assignment-card';
+    const sessionsHTML = g.sessions.map(s => `
+      <div class="session-row">
+        <div class="client-name" style="margin-top:0;">👤 ${s.client}</div>
+        <div class="time-badge">${s.time}</div>
+      </div>`).join('');
     div.innerHTML = `
-      <div class="avatar-circle" style="background:${colorFor(a.staff)}">${initials(a.staff)}</div>
-      <div class="staff-name">${a.staff}</div>
-      <div class="client-name">👤 ${a.client}</div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;">📍 ${a.location}</div>
-      <div class="time-badge">${a.time}</div>`;
+      <div class="avatar-circle" style="background:${colorFor(g.staff)}">${initials(g.staff)}</div>
+      <div class="staff-name">${g.staff}</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;margin-bottom:10px;">📍 ${g.location}</div>
+      <div class="sessions-list">${sessionsHTML}</div>`;
     grid.appendChild(div);
   });
+
   document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('timeline-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
