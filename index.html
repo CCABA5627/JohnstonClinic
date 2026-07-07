@@ -370,6 +370,9 @@
   <div class="nav-item" onclick="showPage('feedback')" id="nav-feedback">
     <span class="icon">💬</span><span>Share Feedback</span>
   </div>
+  <div class="nav-item" onclick="showPage('reminders')" id="nav-reminders">
+    <span class="icon">📌</span><span>Reminders</span>
+  </div>
   <div class="nav-item" onclick="showPage('calendar')" id="nav-calendar">
     <span class="icon">🗓️</span><span>Team Calendar</span>
   </div>
@@ -532,6 +535,17 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- REMINDERS -->
+  <section class="page-section" id="page-reminders">
+    <div class="topbar">
+      <div class="topbar-title">
+        <h2>📌 Reminders</h2>
+        <p>Clinic rules, guidelines and important notes</p>
+      </div>
+    </div>
+    <div id="reminders-grid" class="grid-2"></div>
   </section>
 
   <!-- CALENDAR -->
@@ -775,29 +789,42 @@ async function fetchSchedulesFromSupabase() {
     });
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
-      // Build schedules object keyed by staff name
+      // Build sessions map: staffName -> [{day, start, end, client}]
       const built = {};
-      const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
       data.forEach(r => {
         if (!built[r.staff_name]) built[r.staff_name] = [];
         built[r.staff_name].push({
           day: r.day,
           start: r.start_time,
           end: r.end_time,
-          clients: r.clients,
+          client: r.client_name || r.clients || '',
           location: 'Center'
         });
       });
-      // Sort each staff's days
-      Object.keys(built).forEach(name => {
-        built[name].sort((a,b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-      });
       schedules = built;
       saveData('cc_schedules', schedules);
-      renderSchedules();
     }
+  } catch(e) {}
+}
+
+async function fetchAvailabilityFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_availability?order=staff_name.asc,day.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const built = {};
+      data.forEach(r => {
+        if (!built[r.staff_name]) built[r.staff_name] = [];
+        built[r.staff_name].push({ day: r.day, start: r.start_time, end: r.end_time });
+      });
+      availability = built;
+      saveData('cc_availability', availability);
+    }
+    renderSchedules();
   } catch(e) {
-    // Fall back to stored data
+    renderSchedules();
   }
 }
 
@@ -806,7 +833,7 @@ function saveData(key, val) {
 }
 
 // ===================== STATE =====================
-let calYear = 2026, calMonth = 5; // 0-indexed
+let calYear = 2026, calMonth = 5;
 let selectedStaff = null;
 let assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
 let staffList = loadData('cc_staff', DEFAULT_STAFF);
@@ -814,6 +841,7 @@ let shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
 let shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
 let trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
 let schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+let availability = loadData('cc_availability', {});
 let calEvents = loadData('cc_cal_events', DEFAULT_CALENDAR_EVENTS);
 let timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
 let timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
@@ -925,13 +953,42 @@ function closeRBTModal(e) {
   if(e.target.id==='rbt-modal') document.getElementById('rbt-modal').classList.remove('show');
 }
 
+// ===================== REMINDERS =====================
+const DEFAULT_REMINDERS = [
+  { title: '🌳 Outside Play Rules', color: 'var(--green)', items: ['Always have a staff member present outside', 'Check playground equipment before use', 'No running near the parking lot', 'Apply sunscreen if outside 30+ min'] },
+  { title: '👥 Group Time Rules', color: 'var(--blue)', items: ['Begin with a greeting activity', 'Use visual supports and schedules', 'Reinforce appropriate social behaviors immediately', 'Maximum 4 clients per group unless BCBA approved'] },
+];
+let reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
+
+function renderReminders() {
+  const grid = document.getElementById('reminders-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  if(!reminders.length) {
+    grid.innerHTML = '<p style="color:var(--muted);font-size:0.88rem;grid-column:1/-1;">No reminders posted yet. Add them via the admin panel.</p>';
+    return;
+  }
+  reminders.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.borderTop = `4px solid ${r.color||'var(--blue)'}`;
+    card.innerHTML = `
+      <div class="card-title">${r.title}</div>
+      <ul style="padding-left:18px;display:flex;flex-direction:column;gap:8px;">
+        ${(r.items||[]).map(item=>`<li style="font-size:0.88rem;line-height:1.6;color:var(--text);">${item}</li>`).join('')}
+      </ul>`;
+    grid.appendChild(card);
+  });
+}
+
 // ===================== RENDER: SCHEDULES =====================
 function renderSchedules() {
-  const names = Object.keys(schedules);
-  if(!selectedStaff || !names.includes(selectedStaff)) selectedStaff = names[0];
+  const allNames = [...new Set([...Object.keys(schedules), ...Object.keys(availability)])].sort();
+  if(!selectedStaff || !allNames.includes(selectedStaff)) selectedStaff = allNames[0];
+
   const tabs = document.getElementById('staff-tabs');
   tabs.innerHTML = '';
-  names.forEach(name => {
+  allNames.forEach(name => {
     const btn = document.createElement('div');
     btn.className = 'staff-tab' + (name===selectedStaff?' active':'');
     btn.textContent = name.split(' ')[0];
@@ -939,18 +996,122 @@ function renderSchedules() {
     btn.onclick = () => { selectedStaff=name; renderSchedules(); };
     tabs.appendChild(btn);
   });
+
+  // Remove old visual grid if any
+  const old = document.getElementById('sched-visual-grid');
+  if(old) old.remove();
   const tbody = document.getElementById('schedule-body');
   tbody.innerHTML = '';
-  const rows = schedules[selectedStaff] || [];
-  if(!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);padding:16px;text-align:center;">No scheduled sessions found for ${selectedStaff||'this staff member'}.</td></tr>`;
+  const table = tbody.closest('table');
+
+  const sessions = schedules[selectedStaff] || [];
+  const avail = availability[selectedStaff] || [];
+
+  if(!sessions.length && !avail.length) {
+    table.style.display='';
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);padding:20px;text-align:center;font-size:0.88rem;">No schedule data for ${selectedStaff||'this staff member'}.<br><span style="font-size:0.8rem;opacity:0.7;">Push from CCABA Scheduling to update.</span></td></tr>`;
     return;
   }
-  rows.forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td><strong>${row.day}</strong></td><td>${row.start}</td><td>${row.end}</td><td>${row.clients}</td><td>${row.location||'Center'}</td>`;
-    tbody.appendChild(tr);
+  table.style.display = 'none';
+
+  // Time helpers
+  function t2m(t){const[ti,ap]=t.split(' ');const[h,m]=ti.split(':').map(Number);let hr=h;if(ap==='PM'&&h!==12)hr=h+12;if(ap==='AM'&&h===12)hr=0;return hr*60+m;}
+  function mToTime(m){const hr=Math.floor(m/60);const mn=m%60;const ap=hr<12?'AM':'PM';const h12=hr===0?12:hr>12?hr-12:hr;return`${h12}:${mn===0?'00':mn} ${ap}`;}
+
+  const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const SLOT_H = 22, COL_W = 120, LABEL_W = 75;
+
+  // Find all days that appear in either sessions or availability
+  const daySet = new Set([...sessions.map(s=>s.day), ...avail.map(a=>a.day)]);
+  const workDays = DAY_ORDER.filter(d=>daySet.has(d));
+
+  // Build maps
+  const sessionMap = {}; // day -> [{start,end,client}]
+  sessions.forEach(s=>{
+    if(!sessionMap[s.day])sessionMap[s.day]=[];
+    sessionMap[s.day].push({start:s.start,end:s.end,client:s.client||''});
   });
+  const availMap = {}; // day -> {startM, endM}
+  avail.forEach(a=>{ availMap[a.day]={startM:t2m(a.start),endM:t2m(a.end)}; });
+
+  // Find overall time range
+  let minM=999, maxM=0;
+  avail.forEach(a=>{ if(t2m(a.start)<minM)minM=t2m(a.start); if(t2m(a.end)>maxM)maxM=t2m(a.end); });
+  sessions.forEach(s=>{ if(t2m(s.start)<minM)minM=t2m(s.start); if(t2m(s.end)>maxM)maxM=t2m(s.end); });
+  if(minM===999)minM=t2m('8:00 AM');
+  if(maxM===0)maxM=t2m('5:00 PM');
+  minM=Math.floor(minM/15)*15; maxM=Math.ceil(maxM/15)*15;
+
+  // Generate 15-min slots
+  const slots=[];
+  for(let m=minM;m<maxM;m+=15)slots.push(m);
+
+  // Track rowspan consumed cells
+  const consumed={};
+  workDays.forEach(d=>{consumed[d]=new Set();});
+
+  let gridHtml=`
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:0.78rem;color:var(--muted);">
+    <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:#9FE1CB;border:1px solid #1D9E75;display:inline-block;"></span>Assigned session</span>
+    <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:#E6F1FB;border:1px solid #85B7EB;display:inline-block;"></span>Available</span>
+    <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:#f5f5f3;border:1px solid rgba(0,0,0,.1);display:inline-block;"></span>Not working</span>
+  </div>
+  <div style="overflow-x:auto;">
+  <table style="border-collapse:collapse;min-width:${LABEL_W+COL_W*workDays.length}px;">
+  <thead><tr>
+    <th style="width:${LABEL_W}px;border-right:2px solid var(--gray);background:#fff;"></th>
+    ${workDays.map(d=>`<th style="width:${COL_W}px;text-align:center;font-size:0.75rem;font-weight:700;color:var(--blue-dark);padding:8px 4px;text-transform:uppercase;letter-spacing:0.06em;background:#fff;">${d}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  slots.forEach(slotM=>{
+    const t=mToTime(slotM);
+    const nextM=slotM+15;
+    const isHour=slotM%60===0;
+
+    gridHtml+=`<tr>
+      <td style="font-size:0.7rem;color:var(--muted);text-align:right;padding:0 8px 0 0;height:${SLOT_H}px;white-space:nowrap;vertical-align:middle;border-right:2px solid var(--gray);font-weight:${isHour?'600':'400'};">${isHour?t:''}</td>`;
+
+    workDays.forEach(d=>{
+      if(consumed[d].has(slotM)){return;}
+
+      const av=availMap[d];
+      const isAvail=av&&slotM>=av.startM&&slotM<av.endM;
+
+      // Check if a session starts at or before this slot and ends after it
+      const dayS=sessionMap[d]||[];
+      const session=dayS.find(s=>t2m(s.start)<=slotM&&t2m(s.end)>slotM);
+
+      if(session){
+        const sEndM=t2m(session.end);
+        // Count consecutive slots this session covers
+        const spanSlots=slots.filter(sm=>sm>=slotM&&sm<sEndM&&!consumed[d].has(sm));
+        const rowspan=spanSlots.length||1;
+        spanSlots.slice(1).forEach(sm=>consumed[d].add(sm));
+        const blockH=rowspan*SLOT_H;
+        const shortClient=session.client.length>16?session.client.slice(0,15)+'…':session.client;
+        const nextSlotTime=mToTime(sEndM);
+        gridHtml+=`<td rowspan="${rowspan}" style="vertical-align:top;padding:2px;border:0.5px solid rgba(0,0,0,.06);">
+          <div style="background:#9FE1CB;border:1.5px solid #1D9E75;border-radius:5px;height:${blockH-6}px;padding:4px 6px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start;cursor:default;" title="${session.client} ${session.start}–${session.end}">
+            <div style="font-size:0.72rem;font-weight:700;color:#04342C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${shortClient}</div>
+            <div style="font-size:0.68rem;color:#0F6E56;margin-top:1px;">${session.start}–${session.end}</div>
+          </div>
+        </td>`;
+      } else if(isAvail){
+        gridHtml+=`<td style="background:#E6F1FB;border:0.5px solid #C5DCEF;height:${SLOT_H}px;"></td>`;
+      } else {
+        gridHtml+=`<td style="background:#f5f5f3;border:0.5px solid rgba(0,0,0,.06);height:${SLOT_H}px;"></td>`;
+      }
+    });
+
+    gridHtml+=`</tr>`;
+  });
+
+  gridHtml+=`</tbody></table></div>`;
+
+  const container = document.createElement('div');
+  container.id = 'sched-visual-grid';
+  container.innerHTML = gridHtml;
+  tbody.closest('.card').appendChild(container);
 }
 
 // ===================== RENDER: TRAINING =====================
@@ -1074,13 +1235,14 @@ function showToast(msg, isErr) {
 function init() {
   fetchAssignmentsFromSupabase();
   fetchStaffFromSupabase();
-  fetchSchedulesFromSupabase();
-  setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000); // auto-refresh every 5 min
+  fetchSchedulesFromSupabase().then(() => fetchAvailabilityFromSupabase());
+  setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
   renderTimeline();
   renderStaff();
   renderSchedules();
   renderTraining();
   renderShoutouts();
+  renderReminders();
   renderCalendar();
   // Listen for storage changes from admin
   window.addEventListener('storage', (e) => {
