@@ -935,16 +935,21 @@ function openRBTModal(i) {
   const s = staffList[i];
   const facts = s.facts;
   const rows = [
-    ['🏠 Hometown', facts.hometown], ['🎓 College', facts.college],
-    ['🍕 Favorite food', facts.fave_food], ['🎮 Hobbies', facts.hobbies],
-    ['📺 Favorite show', facts.fave_show], ['⭐ Fun fact', facts.fun_fact],
+    ['🏠 Hometown', facts.hometown],
+    ['🍕 Favorite food', facts.fave_food],
+    ['🍰 Favorite dessert/snack', facts.fave_dessert],
+    ['🎮 Hobbies', facts.hobbies],
+    ['📺 Favorite show/movie', facts.fave_show],
+    ['🎵 Favorite artist/song', facts.fave_artist],
+    ['🎨 Favorite color', facts.fave_color],
+    ['⭐ Fun fact', facts.fun_fact],
   ];
   document.getElementById('rbt-modal-content').innerHTML = `
     <div class="avatar-circle" style="background:${colorFor(s.name)};width:64px;height:64px;font-size:1.5rem;margin:0 auto 12px;">${initials(s.name)}</div>
     <div class="rbt-name">${s.name}</div>
     <div class="rbt-role">${s.role}</div>
     <div class="fun-fact-list" style="margin-top:20px;">
-      ${rows.map(([l,v])=>`<div class="fun-fact"><span class="label" style="min-width:130px;font-size:0.85rem;">${l}</span><span class="val" style="font-size:0.9rem;">${v||'—'}</span></div>`).join('')}
+      ${rows.map(([l,v])=>`<div class="fun-fact"><span class="label" style="min-width:150px;font-size:0.85rem;">${l}</span><span class="val" style="font-size:0.9rem;">${v||'—'}</span></div>`).join('')}
     </div>`;
   document.getElementById('rbt-modal').classList.add('show');
 }
