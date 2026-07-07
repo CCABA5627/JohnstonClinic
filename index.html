@@ -729,7 +729,7 @@ async function fetchAssignmentsFromSupabase() {
     if (Array.isArray(data) && data.length > 0) {
       assignments = data.map(r => ({ staff: r.staff, client: r.client, time: r.time, location: r.location }));
       document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-      document.getElementById('sync-status').textContent = '✓ Live from PodScheduler';
+      document.getElementById('sync-status').textContent = '✓ Live from CCABA Scheduling';
       document.getElementById('sync-status').style.background = 'rgba(107,191,127,0.25)';
     } else {
       document.getElementById('sync-status').textContent = '— No assignments pushed yet for today';
@@ -739,6 +739,70 @@ async function fetchAssignmentsFromSupabase() {
     document.getElementById('sync-status').textContent = '⚠ Could not connect to database';
     renderToday();
   }
+}
+
+async function fetchStaffFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      // Merge live names with any stored profile facts (hometown, fun facts etc from admin panel)
+      const stored = loadData('cc_staff', []);
+      const storedMap = {};
+      stored.forEach(s => { storedMap[s.name] = s; });
+      staffList = data.map(r => {
+        const existing = storedMap[r.name];
+        return {
+          name: r.name,
+          role: existing?.role || 'RBT',
+          facts: existing?.facts || { hometown:'—', college:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
+        };
+      });
+      saveData('cc_staff', staffList);
+      renderStaff();
+    }
+  } catch(e) {
+    // Fall back to stored data — renderStaff already called in init
+  }
+}
+
+async function fetchSchedulesFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_schedules?order=staff_name.asc,day.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      // Build schedules object keyed by staff name
+      const built = {};
+      const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      data.forEach(r => {
+        if (!built[r.staff_name]) built[r.staff_name] = [];
+        built[r.staff_name].push({
+          day: r.day,
+          start: r.start_time,
+          end: r.end_time,
+          clients: r.clients,
+          location: 'Center'
+        });
+      });
+      // Sort each staff's days
+      Object.keys(built).forEach(name => {
+        built[name].sort((a,b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+      });
+      schedules = built;
+      saveData('cc_schedules', schedules);
+      renderSchedules();
+    }
+  } catch(e) {
+    // Fall back to stored data
+  }
+}
+
+function saveData(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
 }
 
 // ===================== STATE =====================
@@ -864,21 +928,27 @@ function closeRBTModal(e) {
 // ===================== RENDER: SCHEDULES =====================
 function renderSchedules() {
   const names = Object.keys(schedules);
-  if(!selectedStaff) selectedStaff = names[0];
+  if(!selectedStaff || !names.includes(selectedStaff)) selectedStaff = names[0];
   const tabs = document.getElementById('staff-tabs');
   tabs.innerHTML = '';
   names.forEach(name => {
     const btn = document.createElement('div');
     btn.className = 'staff-tab' + (name===selectedStaff?' active':'');
     btn.textContent = name.split(' ')[0];
+    btn.title = name;
     btn.onclick = () => { selectedStaff=name; renderSchedules(); };
     tabs.appendChild(btn);
   });
   const tbody = document.getElementById('schedule-body');
   tbody.innerHTML = '';
-  (schedules[selectedStaff]||[]).forEach(row => {
+  const rows = schedules[selectedStaff] || [];
+  if(!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);padding:16px;text-align:center;">No scheduled sessions found for ${selectedStaff||'this staff member'}.</td></tr>`;
+    return;
+  }
+  rows.forEach(row => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><strong>${row.day}</strong></td><td>${row.start}</td><td>${row.end}</td><td>${row.clients}</td><td>${row.location}</td>`;
+    tr.innerHTML = `<td><strong>${row.day}</strong></td><td>${row.start}</td><td>${row.end}</td><td>${row.clients}</td><td>${row.location||'Center'}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1003,6 +1073,8 @@ function showToast(msg, isErr) {
 // ===================== INIT =====================
 function init() {
   fetchAssignmentsFromSupabase();
+  fetchStaffFromSupabase();
+  fetchSchedulesFromSupabase();
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000); // auto-refresh every 5 min
   renderTimeline();
   renderStaff();
