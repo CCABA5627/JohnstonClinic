@@ -354,8 +354,6 @@
     </div>
   </section>
 
-</main>
-
   <!-- REMINDERS MANAGEMENT -->
   <section class="page-section" id="page-reminders-mgmt">
     <div class="topbar">
@@ -364,6 +362,8 @@
     </div>
     <div class="grid-2" id="reminders-admin-grid"></div>
   </section>
+
+</main>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-assignment" onclick="closeModalOnBg(event,'modal-assignment')">
@@ -689,14 +689,30 @@ function renderDashboard() {
 
 // ===================== ASSIGNMENTS =====================
 function renderAssignmentTable() {
-  document.getElementById('assignment-table').innerHTML = assignments.map((a,i)=>`
-    <tr>
-      <td><span class="avatar-sm" style="background:${colorFor(a.staff)}">${initials(a.staff)}</span>${a.staff}</td>
-      <td>${a.client}</td>
-      <td>${a.time}</td>
-      <td>${a.location}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteAssignment(${i})">Remove</button></td>
-    </tr>`).join('');
+  // Group assignments by staff name
+  const grouped = {};
+  assignments.forEach(a => {
+    if (!grouped[a.staff]) grouped[a.staff] = [];
+    grouped[a.staff].push(a);
+  });
+
+  let html = '';
+  Object.entries(grouped).forEach(([staff, rows]) => {
+    rows.forEach((a, i) => {
+      html += `<tr style="${i === 0 ? 'border-top: 2px solid var(--gray);' : ''}">
+        <td style="font-weight:${i===0?'600':'400'};color:${i===0?'var(--blue-dark)':'var(--muted)'};">
+          ${i === 0 ? `<span class="avatar-sm" style="background:${colorFor(a.staff)}">${initials(a.staff)}</span>${a.staff}` : '<span style="padding-left:42px;font-size:0.8rem;">↳</span>'}
+        </td>
+        <td>${a.client}</td>
+        <td>${a.time}</td>
+        <td>${a.location}</td>
+        <td>${i === 0 ? `<button class="btn btn-danger btn-sm" onclick="deleteAssignment(${assignments.indexOf(a)})">Remove</button>` : `<button class="btn btn-danger btn-sm" onclick="deleteAssignment(${assignments.indexOf(a)})">Remove</button>`}</td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('assignment-table').innerHTML = html ||
+    '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No assignments yet — push from CCABA Scheduling.</td></tr>';
 }
 function addAssignment() {
   const a={staff:document.getElementById('new-a-staff').value.trim(),client:document.getElementById('new-a-client').value.trim(),time:document.getElementById('new-a-time').value.trim(),location:document.getElementById('new-a-loc').value.trim()};
