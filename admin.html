@@ -142,7 +142,7 @@
     <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
-    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin</p>
   </div>
 </div>
 
@@ -171,7 +171,11 @@
   <div class="nav-item" onclick="showPage('reminders-mgmt')" id="nav-reminders-mgmt"><span class="icon">📌</span><span>Reminders</span></div>
   <div class="sidebar-footer">
     <div>Logged in as <strong>Admin</strong></div>
-    <div style="margin-top:6px;"><span onclick="doLogout()" style="cursor:pointer;color:rgba(255,255,255,0.5);">Sign Out</span> · <a href="index.html" target="_blank">View Portal →</a></div>
+    <div style="margin-top:8px;">
+      <button onclick="refreshFromScheduling()" style="width:100%;padding:7px;border-radius:7px;border:none;background:#1D9E75;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;margin-bottom:6px;" id="refresh-btn">🔄 Refresh from Scheduling</button>
+    </div>
+    <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin-bottom:6px;" id="refresh-status"></div>
+    <div><span onclick="doLogout()" style="cursor:pointer;color:rgba(255,255,255,0.5);">Sign Out</span> · <a href="index.html" target="_blank">View Portal →</a></div>
   </div>
 </aside>
 
@@ -525,6 +529,68 @@ const DEFAULT_CAL_EVENTS=[{date:'2026-06-05',type:'birthday',label:"🎂 Mia's B
 
 let assignments, staffList, shoutoutsClient, shoutoutsStaff, trainingPairs, schedules, calEvents, timelineMorning, timelineAfternoon, timelineNotes, feedback;
 
+// ===================== SUPABASE =====================
+const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
+
+async function fetchAssignmentsFromSupabase() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/assignments?date=eq.${today}&order=created_at.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      assignments = data.map(r => ({ staff: r.staff, client: r.client, time: r.time, location: r.location || 'Center' }));
+      saveData('cc_assignments', assignments);
+    } else {
+      assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+    }
+    renderAssignmentTable();
+    renderDashboard();
+  } catch(e) {
+    assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+    renderAssignmentTable();
+  }
+}
+
+async function fetchSchedulesFromSupabase() {
+  const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_schedules?order=staff_name.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const built = {};
+      data.forEach(r => {
+        if (!built[r.staff_name]) built[r.staff_name] = [];
+        built[r.staff_name].push({
+          day: r.day,
+          start: r.start_time,
+          end: r.end_time,
+          clients: r.client_name || r.clients || '—',
+          location: 'Center'
+        });
+      });
+      // Sort each staff's days correctly
+      Object.keys(built).forEach(name => {
+        built[name].sort((a,b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+      });
+      schedules = built;
+      saveData('cc_schedules', schedules);
+    } else {
+      schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+    }
+    renderScheduleSelect();
+    renderScheduleMgmt();
+  } catch(e) {
+    schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+    renderScheduleSelect();
+    renderScheduleMgmt();
+  }
+}
+
 function reloadData() {
   assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
   staffList = loadData('cc_staff', DEFAULT_STAFF);
@@ -540,7 +606,7 @@ function reloadData() {
 }
 
 // ===================== AUTH =====================
-const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
+const ADMIN_USER = 'admin', ADMIN_PASS = 'Roundknot5627!';
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
@@ -584,11 +650,12 @@ function showToast(msg) {
 function renderAll() {
   reloadData();
   reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
+  // Fetch live data from Supabase
+  fetchAssignmentsFromSupabase();
+  fetchSchedulesFromSupabase();
+  // Render everything else from localStorage
   renderDashboard();
-  renderAssignmentTable();
   renderRBTTable();
-  renderScheduleSelect();
-  renderScheduleMgmt();
   renderTrainingTable();
   renderShoutoutsMgmt();
   renderFeedback();
@@ -683,8 +750,10 @@ function renderScheduleSelect() {
 }
 function renderScheduleMgmt() {
   const name=document.getElementById('sched-staff-select').value;
-  document.getElementById('sched-table-body').innerHTML=(schedules[name]||[]).map((r,i)=>`
-    <tr><td><strong>${r.day}</strong></td><td>${r.start}</td><td>${r.end}</td><td>${r.clients}</td><td>${r.location}</td>
+  const DAY_ORDER=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const rows=(schedules[name]||[]).slice().sort((a,b)=>DAY_ORDER.indexOf(a.day)-DAY_ORDER.indexOf(b.day));
+  document.getElementById('sched-table-body').innerHTML=rows.map((r,i)=>`
+    <tr><td><strong>${r.day}</strong></td><td>${r.start}</td><td>${r.end}</td><td>${r.clients||r.client||'—'}</td><td>${r.location||'Center'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteShift('${name}',${i})">Remove</button></td></tr>`).join('');
 }
 function addShift() {
@@ -888,6 +957,26 @@ function deleteReminder(i) {
   saveData('cc_reminders', reminders);
   renderRemindersMgmt();
   showToast('Reminder deleted.');
+}
+
+async function refreshFromScheduling() {
+  const btn = document.getElementById('refresh-btn');
+  const status = document.getElementById('refresh-status');
+  btn.textContent = '⏳ Refreshing...';
+  btn.disabled = true;
+  try {
+    await fetchAssignmentsFromSupabase();
+    await fetchSchedulesFromSupabase();
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    status.textContent = '✓ Updated at ' + time;
+    status.style.color = '#5DCAA5';
+    showToast('✓ Refreshed from CCABA Scheduling!');
+  } catch(e) {
+    status.textContent = '⚠ Could not connect';
+    status.style.color = '#F0997B';
+  }
+  btn.textContent = '🔄 Refresh from Scheduling';
+  btn.disabled = false;
 }
 
 // ===================== INIT =====================
