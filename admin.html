@@ -142,7 +142,7 @@
     <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
-    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
   </div>
 </div>
 
@@ -533,80 +533,177 @@ let assignments, staffList, shoutoutsClient, shoutoutsStaff, trainingPairs, sche
 const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
 
+const SB_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+async function sbGet(table, query='') {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${query}`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+  return res.json();
+}
+async function sbDelete(table, filter) {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, { method: 'DELETE', headers: SB_HEADERS });
+}
+async function sbInsert(table, rows) {
+  if (!rows.length) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: 'POST', headers: SB_HEADERS, body: JSON.stringify(rows) });
+}
+
+// ── FETCH FUNCTIONS ──────────────────────────────────────
 async function fetchAssignmentsFromSupabase() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/assignments?date=eq.${today}&order=created_at.asc`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const data = await res.json();
+    const data = await sbGet('assignments', `?date=eq.${today}&order=created_at.asc`);
     if (Array.isArray(data) && data.length > 0) {
       assignments = data.map(r => ({ staff: r.staff, client: r.client, time: r.time, location: r.location || 'Center' }));
-      saveData('cc_assignments', assignments);
-    } else {
-      assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
-    }
-    renderAssignmentTable();
-    renderDashboard();
-  } catch(e) {
-    assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
-    renderAssignmentTable();
-  }
+    } else { assignments = []; }
+    renderAssignmentTable(); renderDashboard();
+  } catch(e) { assignments = []; renderAssignmentTable(); }
 }
 
 async function fetchSchedulesFromSupabase() {
   const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_schedules?order=staff_name.asc`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const data = await res.json();
+    const data = await sbGet('staff_schedules', '?order=staff_name.asc');
     if (Array.isArray(data) && data.length > 0) {
       const built = {};
       data.forEach(r => {
         if (!built[r.staff_name]) built[r.staff_name] = [];
-        built[r.staff_name].push({
-          day: r.day,
-          start: r.start_time,
-          end: r.end_time,
-          clients: r.client_name || r.clients || '—',
-          location: 'Center'
-        });
+        built[r.staff_name].push({ day: r.day, start: r.start_time, end: r.end_time, clients: r.client_name || r.clients || '—', location: 'Center' });
       });
-      // Sort each staff's days correctly
-      Object.keys(built).forEach(name => {
-        built[name].sort((a,b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-      });
+      Object.keys(built).forEach(name => { built[name].sort((a,b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day)); });
       schedules = built;
-      saveData('cc_schedules', schedules);
-    } else {
-      schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
+    } else { schedules = {}; }
+    renderScheduleSelect(); renderScheduleMgmt();
+  } catch(e) { schedules = {}; renderScheduleSelect(); renderScheduleMgmt(); }
+}
+
+async function fetchShoutoutsFromSupabase() {
+  try {
+    const [cs, ss] = await Promise.all([
+      sbGet('shoutouts_client', '?order=created_at.desc'),
+      sbGet('shoutouts_staff', '?order=created_at.desc')
+    ]);
+    shoutoutsClient = Array.isArray(cs) ? cs.map(r => ({ name: r.name, staff: r.staff, program: r.program, note: r.note, date: r.shoutout_date, _id: r.id })) : [];
+    shoutoutsStaff = Array.isArray(ss) ? ss.map(r => ({ to: r.recipient, from: r.from_person, note: r.note, date: r.shoutout_date, _id: r.id })) : [];
+    renderShoutoutsMgmt(); renderDashboard();
+  } catch(e) {}
+}
+
+async function fetchTrainingFromSupabase() {
+  try {
+    const data = await sbGet('training_pairs', '?order=id.asc');
+    trainingPairs = Array.isArray(data) ? data.map(r => ({ trainee: r.trainee, trainee_role: r.trainee_role, mentor: r.mentor, mentor_role: r.mentor_role, focus: r.focus, dates: r.dates, _id: r.id })) : [];
+    renderTrainingTable();
+  } catch(e) {}
+}
+
+async function fetchCalendarFromSupabase() {
+  try {
+    const data = await sbGet('calendar_events', '?order=event_date.asc');
+    calEvents = Array.isArray(data) ? data.map(r => ({ date: r.event_date, type: r.event_type, label: r.label, _id: r.id })) : [];
+    renderCalMgmt();
+  } catch(e) {}
+}
+
+async function fetchTimelineFromSupabase() {
+  try {
+    const [items, notes] = await Promise.all([
+      sbGet('timeline_items', '?order=sort_order.asc'),
+      sbGet('timeline_notes', '?order=updated_at.desc&limit=1')
+    ]);
+    if (Array.isArray(items) && items.length) {
+      timelineMorning = items.filter(r=>r.block==='morning').map(r=>({ time: r.time_label, label: r.label, sub: r.sub, color: r.color }));
+      timelineAfternoon = items.filter(r=>r.block==='afternoon').map(r=>({ time: r.time_label, label: r.label, sub: r.sub, color: r.color }));
     }
-    renderScheduleSelect();
-    renderScheduleMgmt();
-  } catch(e) {
-    schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
-    renderScheduleSelect();
-    renderScheduleMgmt();
-  }
+    if (Array.isArray(notes) && notes.length) timelineNotes = notes[0].content;
+    renderTimelineMgmt();
+  } catch(e) {}
+}
+
+async function fetchRemindersFromSupabase() {
+  try {
+    const data = await sbGet('reminders', '?order=sort_order.asc');
+    if (Array.isArray(data) && data.length) {
+      reminders = data.map(r => ({ title: r.title, color: r.color, items: r.items, _id: r.id }));
+    }
+    renderRemindersMgmt();
+  } catch(e) {}
+}
+
+async function fetchFeedbackFromSupabase() {
+  try {
+    const data = await sbGet('feedback', '?order=created_at.desc');
+    feedback = Array.isArray(data) ? data.map(r => ({ category: r.category, text: r.note, date: r.created_at, read: r.is_read, _id: r.id })) : [];
+    renderFeedback(); updateUnreadBadge(); renderDashboard();
+  } catch(e) {}
+}
+
+// ── SAVE FUNCTIONS ──────────────────────────────────────
+async function saveClientShoutoutToSupabase(s) {
+  await sbInsert('shoutouts_client', [{ name: s.name, staff: s.staff, program: s.program, note: s.note, shoutout_date: s.date }]);
+}
+async function deleteClientShoutoutFromSupabase(id) {
+  await sbDelete('shoutouts_client', `id=eq.${id}`);
+}
+async function saveStaffShoutoutToSupabase(s) {
+  await sbInsert('shoutouts_staff', [{ recipient: s.to, from_person: s.from, note: s.note, shoutout_date: s.date }]);
+}
+async function deleteStaffShoutoutFromSupabase(id) {
+  await sbDelete('shoutouts_staff', `id=eq.${id}`);
+}
+async function saveTrainingPairToSupabase(p) {
+  await sbInsert('training_pairs', [{ trainee: p.trainee, trainee_role: p.trainee_role, mentor: p.mentor, mentor_role: p.mentor_role, focus: p.focus, dates: p.dates }]);
+}
+async function deleteTrainingPairFromSupabase(id) {
+  await sbDelete('training_pairs', `id=eq.${id}`);
+}
+async function saveCalEventToSupabase(e) {
+  await sbInsert('calendar_events', [{ event_date: e.date, event_type: e.type, label: e.label }]);
+}
+async function deleteCalEventFromSupabase(id) {
+  await sbDelete('calendar_events', `id=eq.${id}`);
+}
+async function saveTimelineToSupabase() {
+  await sbDelete('timeline_items', 'block=neq.null');
+  const rows = [
+    ...timelineMorning.map((t,i) => ({ block:'morning', time_label:t.time, label:t.label, sub:t.sub, color:t.color, sort_order:i })),
+    ...timelineAfternoon.map((t,i) => ({ block:'afternoon', time_label:t.time, label:t.label, sub:t.sub, color:t.color, sort_order:i }))
+  ];
+  await sbInsert('timeline_items', rows);
+  await sbDelete('timeline_notes', 'content=neq.null');
+  await sbInsert('timeline_notes', [{ content: timelineNotes }]);
+}
+async function saveReminderToSupabase(r, idx) {
+  if (r._id) await sbDelete('reminders', `id=eq.${r._id}`);
+  await sbInsert('reminders', [{ title: r.title, color: r.color, items: JSON.stringify(r.items), sort_order: idx }]);
+}
+async function deleteReminderFromSupabase(id) {
+  await sbDelete('reminders', `id=eq.${id}`);
+}
+async function markFeedbackReadInSupabase(id) {
+  await fetch(`${SUPABASE_URL}/rest/v1/feedback?id=eq.${id}`, { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ is_read: true }) });
+}
+async function markAllFeedbackReadInSupabase() {
+  await fetch(`${SUPABASE_URL}/rest/v1/feedback?is_read=eq.false`, { method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ is_read: true }) });
 }
 
 function reloadData() {
-  assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
+  // Set defaults — Supabase fetches will overwrite these
+  assignments = [];
   staffList = loadData('cc_staff', DEFAULT_STAFF);
-  shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
-  shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
-  trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
-  schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
-  calEvents = loadData('cc_cal_events', DEFAULT_CAL_EVENTS);
-  timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
-  timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
-  timelineNotes = loadData('cc_timeline_notes', DEFAULT_TIMELINE_NOTES);
-  feedback = loadData('cc_feedback', []);
+  shoutoutsClient = [];
+  shoutoutsStaff = [];
+  trainingPairs = [];
+  schedules = {};
+  calEvents = [];
+  timelineMorning = DEFAULT_TIMELINE_MORNING;
+  timelineAfternoon = DEFAULT_TIMELINE_AFTERNOON;
+  timelineNotes = DEFAULT_TIMELINE_NOTES;
+  feedback = [];
+  reminders = DEFAULT_REMINDERS;
 }
 
 // ===================== AUTH =====================
-const ADMIN_USER = 'admin', ADMIN_PASS = 'Roundknot5627!';
+const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
@@ -649,11 +746,7 @@ function showToast(msg) {
 // ===================== RENDER ALL =====================
 function renderAll() {
   reloadData();
-  reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
-  // Fetch live data from Supabase
-  fetchAssignmentsFromSupabase();
-  fetchSchedulesFromSupabase();
-  // Render everything else from localStorage
+  // Render shell immediately with defaults
   renderDashboard();
   renderRBTTable();
   renderTrainingTable();
@@ -663,6 +756,15 @@ function renderAll() {
   renderCalMgmt();
   renderRemindersMgmt();
   updateUnreadBadge();
+  // Then fetch everything live from Supabase
+  fetchAssignmentsFromSupabase();
+  fetchSchedulesFromSupabase();
+  fetchShoutoutsFromSupabase();
+  fetchTrainingFromSupabase();
+  fetchCalendarFromSupabase();
+  fetchTimelineFromSupabase();
+  fetchRemindersFromSupabase();
+  fetchFeedbackFromSupabase();
 }
 
 // ===================== DASHBOARD =====================
@@ -794,9 +896,14 @@ function renderTrainingTable() {
 function addTrainingPair() {
   const p={trainee:document.getElementById('tr-trainee').value.trim(),trainee_role:document.getElementById('tr-trainee-role').value.trim(),mentor:document.getElementById('tr-mentor').value.trim(),mentor_role:document.getElementById('tr-mentor-role').value.trim(),focus:document.getElementById('tr-focus').value.trim(),dates:document.getElementById('tr-dates').value.trim()};
   if(!p.trainee||!p.mentor) { showToast('Please fill trainee and mentor names.'); return; }
-  trainingPairs.push(p); saveData('cc_training',trainingPairs); renderTrainingTable(); closeModal('modal-training'); showToast('Training pair added!');
+  saveTrainingPairToSupabase(p).then(()=>fetchTrainingFromSupabase()); closeModal('modal-training'); showToast('Training pair added!');
 }
-function deleteTrainingPair(i) { trainingPairs.splice(i,1); saveData('cc_training',trainingPairs); renderTrainingTable(); showToast('Pair removed.'); }
+function deleteTrainingPair(i) {
+  const id = trainingPairs[i]?._id;
+  if(!confirm('Delete this training pair?')) return;
+  if(id) deleteTrainingPairFromSupabase(id).then(()=>fetchTrainingFromSupabase());
+  showToast('Pair removed.');
+}
 
 // ===================== SHOUTOUTS =====================
 function renderShoutoutsMgmt() {
@@ -814,28 +921,33 @@ function renderShoutoutsMgmt() {
 function addClientShoutout() {
   const n=document.getElementById('cs-name').value.trim(),st=document.getElementById('cs-staff').value.trim(),pr=document.getElementById('cs-program').value.trim(),no=document.getElementById('cs-note').value.trim();
   if(!n||!no) { showToast('Please fill in client name and message.'); return; }
-  shoutoutsClient.unshift({name:n,staff:st,program:pr,note:no,date:today()});
-  saveData('cc_shoutouts_client',shoutoutsClient); renderShoutoutsMgmt(); renderDashboard();
+  const s={name:n,staff:st,program:pr,note:no,date:today()};
+  saveClientShoutoutToSupabase(s).then(()=>{fetchShoutoutsFromSupabase();renderDashboard();});
   ['cs-name','cs-staff','cs-program','cs-note'].forEach(id=>document.getElementById(id).value='');
   showToast('Client shoutout posted! 🎉');
 }
 function addStaffShoutout() {
   const to=document.getElementById('ss-to').value.trim(),fr=document.getElementById('ss-from').value.trim(),no=document.getElementById('ss-note').value.trim();
   if(!to||!no) { showToast('Please fill in staff name and message.'); return; }
-  shoutoutsStaff.unshift({to,from:fr,note:no,date:today()});
-  saveData('cc_shoutouts_staff',shoutoutsStaff); renderShoutoutsMgmt(); renderDashboard();
+  const s={to,from:fr,note:no,date:today()};
+  saveStaffShoutoutToSupabase(s).then(()=>{fetchShoutoutsFromSupabase();renderDashboard();});
   ['ss-to','ss-from','ss-note'].forEach(id=>document.getElementById(id).value='');
   showToast('Staff shoutout posted! 🌟');
 }
-function deleteCS(i){shoutoutsClient.splice(i,1);saveData('cc_shoutouts_client',shoutoutsClient);renderShoutoutsMgmt();}
-function deleteSS(i){shoutoutsStaff.splice(i,1);saveData('cc_shoutouts_staff',shoutoutsStaff);renderShoutoutsMgmt();}
+function deleteCS(i) {
+  const id=shoutoutsClient[i]?._id;
+  if(id) deleteClientShoutoutFromSupabase(id).then(()=>fetchShoutoutsFromSupabase());
+}
+function deleteSS(i) {
+  const id=shoutoutsStaff[i]?._id;
+  if(id) deleteStaffShoutoutFromSupabase(id).then(()=>fetchShoutoutsFromSupabase());
+}
 
 // ===================== FEEDBACK =====================
 function renderFeedback() {
   const el=document.getElementById('feedback-list');
   if(!feedback.length) { el.innerHTML='<p style="color:var(--muted);font-size:0.88rem;">No feedback submitted yet.</p>'; return; }
-  el.innerHTML=feedback.slice().reverse().map((f,ri)=>{
-    const i=feedback.length-1-ri;
+  el.innerHTML=feedback.map((f,i)=>{
     return `<div class="fb-item ${f.read?'':'unread'}">
       <div class="fb-meta">
         <span class="badge badge-blue">${f.category}</span>
@@ -848,8 +960,17 @@ function renderFeedback() {
   }).join('');
   updateUnreadBadge();
 }
-function markRead(i) { feedback[i].read=true; saveData('cc_feedback',feedback); renderFeedback(); renderDashboard(); }
-function markAllRead() { feedback.forEach(f=>f.read=true); saveData('cc_feedback',feedback); renderFeedback(); renderDashboard(); showToast('All feedback marked as read.'); }
+function markRead(i) {
+  const id=feedback[i]?._id;
+  feedback[i].read=true;
+  if(id) markFeedbackReadInSupabase(id);
+  renderFeedback(); renderDashboard();
+}
+function markAllRead() {
+  feedback.forEach(f=>{f.read=true;});
+  markAllFeedbackReadInSupabase();
+  renderFeedback(); renderDashboard(); showToast('All feedback marked as read.');
+}
 function updateUnreadBadge() {
   const n=feedback.filter(f=>!f.read).length;
   const badge=document.getElementById('unread-badge');
@@ -891,15 +1012,12 @@ function deleteTLItem(block,i){
 }
 function saveTimeline(){
   timelineNotes=document.getElementById('tl-notes-input').value;
-  saveData('cc_timeline_morning',timelineMorning);
-  saveData('cc_timeline_afternoon',timelineAfternoon);
-  saveData('cc_timeline_notes',timelineNotes);
-  showToast('Timeline saved!');
+  saveTimelineToSupabase().then(()=>showToast('Timeline saved! ✓'));
 }
 
 // ===================== CALENDAR =====================
 function renderCalMgmt() {
-  document.getElementById('cal-event-list').innerHTML=calEvents.sort((a,b)=>a.date.localeCompare(b.date)).map((e,i)=>`
+  document.getElementById('cal-event-list').innerHTML=calEvents.slice().sort((a,b)=>a.date.localeCompare(b.date)).map((e,i)=>`
     <li class="cal-event-item">
       <div><strong>${e.date}</strong> — ${e.label}</div>
       <button class="btn btn-danger btn-sm" onclick="deleteCalEvent(${i})">✕</button>
@@ -908,11 +1026,14 @@ function renderCalMgmt() {
 function addCalEvent(){
   const date=document.getElementById('ev-date').value,type=document.getElementById('ev-type').value,label=document.getElementById('ev-label').value.trim();
   if(!date||!label) { showToast('Please fill in date and label.'); return; }
-  calEvents.push({date,type,label}); saveData('cc_cal_events',calEvents); renderCalMgmt();
+  saveCalEventToSupabase({date,type,label}).then(()=>fetchCalendarFromSupabase());
   document.getElementById('ev-date').value=''; document.getElementById('ev-label').value='';
   showToast('Event added to calendar!');
 }
-function deleteCalEvent(i){calEvents.splice(i,1);saveData('cc_cal_events',calEvents);renderCalMgmt();}
+function deleteCalEvent(i){
+  const id=calEvents[i]?._id;
+  if(id) deleteCalEventFromSupabase(id).then(()=>fetchCalendarFromSupabase());
+}
 
 function renderRemindersMgmt() {
   const grid = document.getElementById('reminders-admin-grid');
@@ -957,11 +1078,10 @@ function saveReminder() {
   const itemsRaw = document.getElementById('rem-items').value.trim();
   if(!title) { showToast('Please enter a title.'); return; }
   const items = itemsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
-  const r = { title, color, items };
-  if(idx >= 0) reminders[idx] = r;
-  else reminders.push(r);
-  saveData('cc_reminders', reminders);
-  renderRemindersMgmt();
+  const existing = idx >= 0 ? reminders[idx] : null;
+  const r = { title, color, items, _id: existing?._id };
+  saveReminderToSupabase(r, idx >= 0 ? idx : reminders.length)
+    .then(()=>fetchRemindersFromSupabase());
   closeModal('modal-reminder');
   document.getElementById('reminder-edit-idx').value = '-1';
   showToast('Reminder card saved!');
@@ -969,9 +1089,8 @@ function saveReminder() {
 
 function deleteReminder(i) {
   if(!confirm('Delete this reminder card?')) return;
-  reminders.splice(i, 1);
-  saveData('cc_reminders', reminders);
-  renderRemindersMgmt();
+  const id = reminders[i]?._id;
+  if(id) deleteReminderFromSupabase(id).then(()=>fetchRemindersFromSupabase());
   showToast('Reminder deleted.');
 }
 
@@ -981,12 +1100,20 @@ async function refreshFromScheduling() {
   btn.textContent = '⏳ Refreshing...';
   btn.disabled = true;
   try {
-    await fetchAssignmentsFromSupabase();
-    await fetchSchedulesFromSupabase();
+    await Promise.all([
+      fetchAssignmentsFromSupabase(),
+      fetchSchedulesFromSupabase(),
+      fetchShoutoutsFromSupabase(),
+      fetchTrainingFromSupabase(),
+      fetchCalendarFromSupabase(),
+      fetchTimelineFromSupabase(),
+      fetchRemindersFromSupabase(),
+      fetchFeedbackFromSupabase()
+    ]);
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     status.textContent = '✓ Updated at ' + time;
     status.style.color = '#5DCAA5';
-    showToast('✓ Refreshed from CCABA Scheduling!');
+    showToast('✓ All data refreshed!');
   } catch(e) {
     status.textContent = '⚠ Could not connect';
     status.style.color = '#F0997B';
