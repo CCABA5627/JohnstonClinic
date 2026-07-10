@@ -142,7 +142,7 @@
     <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
-    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
+    <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin</p>
   </div>
 </div>
 
@@ -703,7 +703,7 @@ function reloadData() {
 }
 
 // ===================== AUTH =====================
-const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
+const ADMIN_USER = 'admin', ADMIN_PASS = 'Roundknot5627!';
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
