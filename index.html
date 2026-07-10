@@ -1237,11 +1237,99 @@ function showToast(msg, isErr) {
 }
 
 // ===================== INIT =====================
+async function fetchShoutoutsFromSupabase() {
+  try {
+    const SB = { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } };
+    const [cs, ss] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/shoutouts_client?order=created_at.desc`, SB).then(r=>r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/shoutouts_staff?order=created_at.desc`, SB).then(r=>r.json())
+    ]);
+    if (Array.isArray(cs) && cs.length) shoutoutsClient = cs.map(r=>({ name:r.name, staff:r.staff, program:r.program, note:r.note, date:r.shoutout_date }));
+    if (Array.isArray(ss) && ss.length) shoutoutsStaff = ss.map(r=>({ to:r.recipient, from:r.from_person, note:r.note, date:r.shoutout_date }));
+    renderShoutouts();
+  } catch(e) {}
+}
+
+async function fetchTrainingFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/training_pairs?order=id.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      trainingPairs = data.map(r=>({ trainee:r.trainee, trainee_role:r.trainee_role, mentor:r.mentor, mentor_role:r.mentor_role, focus:r.focus, dates:r.dates }));
+      renderTraining();
+    }
+  } catch(e) {}
+}
+
+async function fetchCalendarFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/calendar_events?order=event_date.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      calEvents = data.map(r=>({ date:r.event_date, type:r.event_type, label:r.label }));
+      renderCalendar();
+    }
+  } catch(e) {}
+}
+
+async function fetchTimelineFromSupabase() {
+  try {
+    const SB = { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } };
+    const [items, notes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/timeline_items?order=sort_order.asc`, SB).then(r=>r.json()),
+      fetch(`${SUPABASE_URL}/rest/v1/timeline_notes?order=updated_at.desc&limit=1`, SB).then(r=>r.json())
+    ]);
+    if (Array.isArray(items) && items.length) {
+      timelineMorning = items.filter(r=>r.block==='morning').map(r=>({ time:r.time_label, label:r.label, sub:r.sub, color:r.color }));
+      timelineAfternoon = items.filter(r=>r.block==='afternoon').map(r=>({ time:r.time_label, label:r.label, sub:r.sub, color:r.color }));
+    }
+    if (Array.isArray(notes) && notes.length) timelineNotes = notes[0].content;
+    renderTimeline();
+  } catch(e) {}
+}
+
+async function fetchRemindersFromSupabase() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/reminders?order=sort_order.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      reminders = data.map(r=>({ title:r.title, color:r.color, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
+      renderReminders();
+    }
+  } catch(e) {}
+}
+
+// Also update feedback submission to go to Supabase
+async function submitFeedback() {
+  const cat = document.getElementById('fb-category').value;
+  const text = document.getElementById('fb-text').value.trim();
+  if(!cat) { showToast('Please select a category.', true); return; }
+  if(!text) { showToast('Please enter your feedback.', true); return; }
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ category: cat, note: text, is_read: false })
+    });
+    document.getElementById('fb-category').value = '';
+    document.getElementById('fb-text').value = '';
+    showToast('Feedback submitted anonymously! Thank you. 💙');
+  } catch(e) {
+    showToast('Could not submit — please try again.', true);
+  }
+}
+
 function init() {
   fetchAssignmentsFromSupabase();
   fetchStaffFromSupabase();
   fetchSchedulesFromSupabase().then(() => fetchAvailabilityFromSupabase());
+  fetchShoutoutsFromSupabase();
+  fetchTrainingFromSupabase();
+  fetchCalendarFromSupabase();
+  fetchTimelineFromSupabase();
+  fetchRemindersFromSupabase();
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
+  // Render with defaults immediately while fetches happen
   renderTimeline();
   renderStaff();
   renderSchedules();
@@ -1249,23 +1337,6 @@ function init() {
   renderShoutouts();
   renderReminders();
   renderCalendar();
-  // Listen for storage changes from admin
-  window.addEventListener('storage', (e) => {
-    if(e.key && e.key.startsWith('cc_')) {
-      assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
-      staffList = loadData('cc_staff', DEFAULT_STAFF);
-      shoutoutsClient = loadData('cc_shoutouts_client', DEFAULT_SHOUTOUTS_CLIENT);
-      shoutoutsStaff = loadData('cc_shoutouts_staff', DEFAULT_SHOUTOUTS_STAFF);
-      trainingPairs = loadData('cc_training', DEFAULT_TRAINING);
-      schedules = loadData('cc_schedules', DEFAULT_SCHEDULES);
-      calEvents = loadData('cc_cal_events', DEFAULT_CALENDAR_EVENTS);
-      timelineMorning = loadData('cc_timeline_morning', DEFAULT_TIMELINE_MORNING);
-      timelineAfternoon = loadData('cc_timeline_afternoon', DEFAULT_TIMELINE_AFTERNOON);
-      timelineNotes = loadData('cc_timeline_notes', DEFAULT_TIMELINE_NOTES);
-      renderToday(); renderTimeline(); renderStaff();
-      renderSchedules(); renderTraining(); renderShoutouts(); renderCalendar();
-    }
-  });
 }
 init();
 </script>
