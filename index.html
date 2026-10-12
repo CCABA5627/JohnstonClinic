@@ -1519,6 +1519,14 @@ async function fetchWeeklySchedule() {
 // Coverage requests are managed by admin via Supabase — no seed data
 const DEFAULT_COVERAGE = [];
 
+// Sync from admin localStorage (cc_admin_coverage is written by admin.html on same device/browser)
+(function() {
+  var adminData = loadData('cc_admin_coverage', null);
+  if (adminData && Array.isArray(adminData)) {
+    // Admin data is source of truth — save it as our copy too
+    saveData('cc_coverage_requests', adminData);
+  }
+})();
 let coverageRequests = loadData('cc_coverage_requests', DEFAULT_COVERAGE);
 let coverageResponses = loadData('cc_coverage_responses', {});  // {id: 'accepted'|'declined'}
 
@@ -1533,9 +1541,9 @@ async function fetchCoverageFromSupabase() {
         id: r.id,
         urgent: r.urgent || false,
         status: r.status || 'open',
-        client: r.client_name,
-        day: r.day_label || 'Today',
-        time: r.time_range,
+        client: r.client || r.client_name || '',
+        day: r.day || r.day_label || 'Today',
+        time: r.time || r.time_range || '',
         reason: r.reason || '',
         recommended: typeof r.recommended === 'string' ? JSON.parse(r.recommended) : (r.recommended || []),
         note: r.note || ''
@@ -1613,6 +1621,12 @@ function undoResponse(id) {
 function renderCoverageRequests() {
   const el = document.getElementById('coverage-requests-list');
   if(!el) return;
+  // Re-sync from admin localStorage each render so deletes/closes show immediately
+  var adminData = loadData('cc_admin_coverage', null);
+  if (adminData && Array.isArray(adminData)) {
+    coverageRequests = adminData;
+    saveData('cc_coverage_requests', adminData);
+  }
 
   const dateEl = document.getElementById('coverage-date');
   if(dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
@@ -1644,11 +1658,11 @@ function renderCoverageRequests() {
     const actionsHtml = myResponse
       ? '<div class="coverage-actions"><div class="cov-responded ' + (myResponse === 'accepted' ? 'accepted' : 'declined-lbl') + '">'
         + (myResponse === 'accepted' ? '&#10003; You accepted' : '&#10007; You declined') + '</div>'
-        + '<button style="margin-top:6px;background:none;border:none;font-size:0.75rem;color:var(--blue);cursor:pointer;text-decoration:underline;" onclick="undoResponse(' + JSON.stringify(r.id) + ')">Undo</button>'
+        + '<button style="margin-top:6px;background:none;border:none;font-size:0.75rem;color:var(--blue);cursor:pointer;text-decoration:underline;" data-action="undo" data-covid="' + r.id + '">Undo</button>'
         + '</div>'
       : '<div class="coverage-actions">'
         + (currentCoverageUser ? '' : '<div style="font-size:0.75rem;color:var(--coral);margin-bottom:6px;">Select your name above first</div>')
-        + '<button class="btn-accept" onclick="respondCoverage(' + JSON.stringify(r.id) + ',' + JSON.stringify('accepted') + ')">&#10003; Accept</button>'
+        + '<button class="btn-accept" data-action="accept" data-covid="' + r.id + '">&#10003; Accept</button>'
         + '</div>';
 
     // Response log panel
@@ -1680,6 +1694,17 @@ function renderCoverageRequests() {
       + logHtml
       + '</div>';
   }).join('');
+
+  // Event delegation for Accept and Undo buttons
+  el.onclick = function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var covId = btn.getAttribute('data-covid');
+    if (!covId) return;
+    var action = btn.getAttribute('data-action');
+    if (action === 'accept') respondCoverage(covId, 'accepted');
+    if (action === 'undo') undoResponse(covId);
+  };
 }
 
 
