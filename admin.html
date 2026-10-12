@@ -1575,10 +1575,32 @@ async function refreshFromScheduling() {
       fetchRemindersFromSupabase(),
       fetchFeedbackFromSupabase()
     ]);
+    // Merge new staff from scheduling site localStorage
+    var added = [];
+    try {
+      var schedData = localStorage.getItem('podscheduler_v4');
+      if (schedData) {
+        var parsed = JSON.parse(schedData);
+        var schedStaff = (parsed.staff || []).map(function(s){ return s.name; }).filter(Boolean);
+        var existingNames = staffList.map(function(s){ return s.name; });
+        schedStaff.forEach(function(name) {
+          if (!existingNames.includes(name)) {
+            staffList.push({ name: name, role: 'RBT', facts: {} });
+            existingNames.push(name);
+            added.push(name);
+          }
+        });
+        if (added.length) {
+          saveData('cc_staff', staffList);
+          renderRBTTable();
+        }
+      }
+    } catch(e) {}
+
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    status.textContent = '✓ Updated at ' + time;
+    status.textContent = '✓ Updated at ' + time + (added.length ? ' · ' + added.length + ' new staff added' : '');
     status.style.color = '#5DCAA5';
-    showToast('✓ All data refreshed!');
+    showToast(added.length ? '✓ Refreshed! Added: ' + added.join(', ') : '✓ All data refreshed!');
   } catch(e) {
     status.textContent = '⚠ Could not connect';
     status.style.color = '#F0997B';
