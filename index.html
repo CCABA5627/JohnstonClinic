@@ -414,6 +414,9 @@
   <div class="nav-item active" onclick="showPage('today')" id="nav-today">
     <span class="icon">📋</span><span>Today's Schedule</span>
   </div>
+  <div class="nav-item" onclick="showPage('weekly')" id="nav-weekly">
+    <span class="icon">📆</span><span>Weekly Schedule</span>
+  </div>
   <div class="nav-item" onclick="showPage('coverage')" id="nav-coverage">
     <span class="icon">🚨</span><span>Coverage Requests</span>
   </div>
@@ -475,6 +478,26 @@
 
 
   <!-- COVERAGE REQUESTS -->
+  <section class="page-section" id="page-weekly">
+    <div class="topbar">
+      <div class="topbar-title">
+        <h2>📆 Weekly Schedule</h2>
+        <p>Full week view pulled from CCABA Scheduling</p>
+      </div>
+      <div class="date-badge" id="timeline-date"></div>
+    </div>
+    <div class="sync-banner" style="margin-bottom:20px;">
+      <div>
+        <h4>🔗 Live from CCABA Scheduling</h4>
+        <p>Reflects the current weekly view. Last synced: <span id="weekly-sync-time">—</span></p>
+      </div>
+      <div class="sync-pill" id="weekly-sync-status">Loading...</div>
+    </div>
+    <div class="card" id="weekly-schedule-card">
+      <div id="weekly-schedule-body" style="font-size:0.88rem;color:var(--muted);padding:20px 0;text-align:center;">Loading weekly schedule...</div>
+    </div>
+  </section>
+
   <section class="page-section" id="page-coverage">
     <div class="topbar">
       <div class="topbar-title">
