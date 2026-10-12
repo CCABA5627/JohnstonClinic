@@ -835,26 +835,23 @@ function doLogout() {
 }
 
 // Auto-login if session is still fresh on page load
-(function() {
+function tryAutoLogin() {
   var saved = localStorage.getItem(SESSION_KEY);
   if(saved) {
     var age = Date.now() - parseInt(saved, 10);
     if(age < INACTIVITY_MS) {
       showAdminApp();
-      // renderAll called after DOM fully ready
-      window.addEventListener('DOMContentLoaded', function() {
-        renderAll();
-        startInactivityTimer();
-        document.addEventListener('mousemove', resetInactivity, { passive: true });
-        document.addEventListener('keydown', resetInactivity, { passive: true });
-        document.addEventListener('click', resetInactivity, { passive: true });
-        document.addEventListener('touchstart', resetInactivity, { passive: true });
-      });
+      renderAll();
+      startInactivityTimer();
+      document.addEventListener('mousemove', resetInactivity, { passive: true });
+      document.addEventListener('keydown', resetInactivity, { passive: true });
+      document.addEventListener('click', resetInactivity, { passive: true });
+      document.addEventListener('touchstart', resetInactivity, { passive: true });
     } else {
       localStorage.removeItem(SESSION_KEY);
     }
   }
-})();
+}
 
 // ===================== NAVIGATION =====================
 function showPage(id) {
@@ -1552,7 +1549,8 @@ async function refreshFromScheduling() {
 }
 
 // ===================== INIT =====================
-// Don't auto-render — only after login
+// Auto-restore session if still valid
+tryAutoLogin();
 </script>
 </body>
 </html>
