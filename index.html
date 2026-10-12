@@ -6,6 +6,8 @@
 <title>Circle City ABA — Staff Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* Hide Netlify badge */
+  [data-netlify-deploy-id], .netlify-badge, a[href*="netlify.com"] { display: none !important; }
   :root {
     --blue: #4A90D9;
     --blue-light: #E8F3FC;
@@ -918,40 +920,47 @@ async function fetchAssignmentsFromSupabase() {
 
 async function fetchStaffFromSupabase() {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {
+    // Try staff_profiles first (full profiles pushed from admin)
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles?order=name.asc`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
-      // Merge Supabase names with admin-added staff — admin entries NOT in Supabase are kept
-      const stored = loadData('cc_staff', []);
-      const storedMap = {};
-      stored.forEach(s => { storedMap[s.name] = s; });
-      const supabaseNames = new Set(data.map(r => r.name));
-      // Build merged list: Supabase staff first (with any stored facts), then admin-only staff
-      const merged = data.map(r => {
-        const existing = storedMap[r.name];
-        return {
-          name: r.name,
-          role: existing?.role || 'RBT',
-          facts: existing?.facts || { hometown:'—', college:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
-        };
-      });
-      // Add any staff added via admin that aren't in Supabase
-      stored.forEach(s => {
-        if (!supabaseNames.has(s.name)) merged.push(s);
-      });
-      staffList = merged;
+      // staff_profiles has full data — use it directly, merged with local PIN accounts
+      staffList = data.map(r => ({
+        name: r.name,
+        role: r.role || 'RBT',
+        facts: r.facts || { hometown:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
+      }));
       saveData('cc_staff', staffList);
-      renderStaff();
-      // Refresh login dropdown with updated names
-      var sel = document.getElementById('sl-name');
-      if (sel) {
-        var accounts = loadData('cc_staff_accounts', {});
-        var names = staffList.map(function(s){ return s.name; }).sort();
-        sel.innerHTML = '<option value="">— Select your name —</option>'
-          + names.map(function(n){ return '<option value="' + n + '">' + n + (accounts[n] ? '' : ' (no PIN)') + '</option>'; }).join('');
+    } else {
+      // Fallback: staff_names (only names, from scheduling site push)
+      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      const data2 = await res2.json();
+      if (Array.isArray(data2) && data2.length > 0) {
+        const stored = loadData('cc_staff', []);
+        const storedMap = {};
+        stored.forEach(s => { storedMap[s.name] = s; });
+        const supabaseNames = new Set(data2.map(r => r.name));
+        const merged = data2.map(r => {
+          const existing = storedMap[r.name];
+          return { name: r.name, role: existing?.role || 'RBT', facts: existing?.facts || { hometown:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' } };
+        });
+        stored.forEach(s => { if (!supabaseNames.has(s.name)) merged.push(s); });
+        staffList = merged;
+        saveData('cc_staff', staffList);
       }
+    }
+    renderStaff();
+    // Refresh login dropdown
+    var sel = document.getElementById('sl-name');
+    if (sel) {
+      var accounts = loadData('cc_staff_accounts', {});
+      var names = staffList.map(function(s){ return s.name; }).sort();
+      sel.innerHTML = '<option value="">— Select your name —</option>'
+        + names.map(function(n){ return '<option value="' + n + '">' + n + (accounts[n] ? '' : ' (no PIN)') + '</option>'; }).join('');
     }
   } catch(e) {
     // Fall back to stored data — renderStaff already called in init

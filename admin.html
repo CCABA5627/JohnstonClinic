@@ -1355,15 +1355,29 @@ function editRBT(i) {
   document.getElementById('rbt-funfact').value=s.facts.fun_fact||'';
   openModal('modal-rbt');
 }
+async function pushStaffProfilesToSupabase() {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles?name=neq.null`, {
+      method: 'DELETE', headers: SB_HEADERS
+    });
+    if (staffList.length > 0) {
+      await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles`, {
+        method: 'POST', headers: SB_HEADERS,
+        body: JSON.stringify(staffList.map(s => ({ name: s.name, role: s.role || 'RBT', facts: s.facts || {} })))
+      });
+    }
+  } catch(e) { console.warn('Staff profile sync failed:', e); }
+}
 function saveRBT() {
   const idx=parseInt(document.getElementById('rbt-edit-idx').value);
   const s={name:document.getElementById('rbt-name').value.trim(),role:document.getElementById('rbt-role').value.trim(),facts:{hometown:document.getElementById('rbt-hometown').value.trim(),fave_food:document.getElementById('rbt-food').value.trim(),fave_dessert:document.getElementById('rbt-dessert').value.trim(),hobbies:document.getElementById('rbt-hobbies').value.trim(),fave_show:document.getElementById('rbt-show').value.trim(),fave_artist:document.getElementById('rbt-artist').value.trim(),fave_color:document.getElementById('rbt-color').value.trim(),fun_fact:document.getElementById('rbt-funfact').value.trim()}};
   if(!s.name) { showToast('Please enter a name.'); return; }
   if(idx>=0) staffList[idx]=s; else staffList.push(s);
   saveData('cc_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
-  document.getElementById('rbt-edit-idx').value=-1; showToast('Profile saved!');
+  document.getElementById('rbt-edit-idx').value=-1;
+  pushStaffProfilesToSupabase().then(() => showToast('Profile saved & synced!'));
 }
-function deleteRBT(i) { if(!confirm('Delete this Staff Profile?')) return; staffList.splice(i,1); saveData('cc_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
+function deleteRBT(i) { if(!confirm('Delete this Staff Profile?')) return; staffList.splice(i,1); saveData('cc_staff',staffList); renderRBTTable(); pushStaffProfilesToSupabase(); showToast('Profile deleted.'); }
 
 // ===================== SCHEDULES =====================
 function renderScheduleSelect() {
