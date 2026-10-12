@@ -1516,22 +1516,8 @@ async function fetchWeeklySchedule() {
 
 // ===================== COVERAGE REQUESTS =====================
 // Seed data — admin can push real requests via Supabase table 'coverage_requests'
-const DEFAULT_COVERAGE = [
-  {
-    id: 'cr1', urgent: true, status: 'open',
-    client: 'AnSa', day: 'Today', time: '1:00–5:00 PM',
-    reason: 'Staff callout — John called out sick',
-    recommended: ['Sarah', 'John', 'Emma'],
-    note: 'Recommended based on availability and familiarity with client'
-  },
-  {
-    id: 'cr2', urgent: false, status: 'open',
-    client: 'Leo M.', day: 'Thursday', time: '9:00 AM–12:00 PM',
-    reason: 'Schedule gap — no staff assigned',
-    recommended: ['Casey Park', 'Mia Torres'],
-    note: 'Casey has worked with Leo before'
-  }
-];
+// Coverage requests are managed by admin via Supabase — no seed data
+const DEFAULT_COVERAGE = [];
 
 let coverageRequests = loadData('cc_coverage_requests', DEFAULT_COVERAGE);
 let coverageResponses = loadData('cc_coverage_responses', {});  // {id: 'accepted'|'declined'}
@@ -1663,7 +1649,6 @@ function renderCoverageRequests() {
       : '<div class="coverage-actions">'
         + (currentCoverageUser ? '' : '<div style="font-size:0.75rem;color:var(--coral);margin-bottom:6px;">Select your name above first</div>')
         + '<button class="btn-accept" onclick="respondCoverage(' + JSON.stringify(r.id) + ',' + JSON.stringify('accepted') + ')">&#10003; Accept</button>'
-        + '<button class="btn-decline" onclick="respondCoverage(' + JSON.stringify(r.id) + ',' + JSON.stringify('declined') + ')">&#10007; Decline</button>'
         + '</div>';
 
     // Response log panel
