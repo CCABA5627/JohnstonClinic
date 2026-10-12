@@ -145,8 +145,8 @@
     <h2>Circle City ABA</h2>
     <p>Admin Portal — Authorized Access Only</p>
     <input type="text" id="login-user" placeholder="Username" />
-    <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
-    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+    <input type="password" id="login-pass" placeholder="Password" id="login-pass" />
+    <button class="btn btn-primary" id="login-btn">Sign In</button>
     <p class="login-error" id="login-error">Incorrect credentials. Please try again.</p>
     <p style="margin-top:18px;font-size:0.75rem;color:var(--muted);">Demo credentials: admin / circleCity2024</p>
   </div>
@@ -1549,6 +1549,9 @@ async function refreshFromScheduling() {
 }
 
 // ===================== INIT =====================
+// Wire up login button and Enter key (inline onclick blocked for local files)
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('login-pass').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
 // Auto-restore session if still valid
 tryAutoLogin();
 </script>
