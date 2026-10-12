@@ -400,15 +400,54 @@
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
     .assignment-grid { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ===== STAFF LOGIN ===== */
+  #staff-login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:linear-gradient(135deg,#1a2535 0%,#3D5A73 100%); position:fixed; inset:0; z-index:9999; }
+  .staff-login-box { background:#fff; border-radius:20px; padding:40px 36px; width:360px; box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center; }
+  .staff-login-box h2 { font-family:'Nunito',sans-serif; font-weight:900; font-size:1.5rem; color:var(--blue-dark); margin-bottom:4px; }
+  .staff-login-box p { color:var(--muted); font-size:0.82rem; margin-bottom:24px; }
+  .staff-login-box select, .staff-login-box input { width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--gray); font-size:0.9rem; font-family:'Inter',sans-serif; outline:none; margin-bottom:12px; color:var(--text); }
+  .staff-login-box select:focus, .staff-login-box input:focus { border-color:var(--blue); }
+  .staff-login-box .btn { width:100%; padding:12px; font-size:1rem; margin-top:4px; }
+  .staff-login-error { color:var(--coral); font-size:0.82rem; margin-top:8px; min-height:20px; }
+  /* Staff badge in sidebar */
+  #staff-badge { padding:10px 14px; margin:8px; border-radius:10px; background:rgba(255,255,255,0.1); display:flex; align-items:center; gap:10px; }
+  #staff-badge .badge-avatar { width:32px;height:32px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.75rem;color:#fff;flex-shrink:0; }
+  #staff-badge .badge-name { font-size:0.82rem; font-weight:700; color:#fff; }
+  #staff-badge .badge-signout { font-size:0.72rem; color:rgba(255,255,255,0.5); cursor:pointer; text-decoration:underline; margin-top:2px; }
 </style>
 </head>
 <body>
+
+<!-- STAFF LOGIN SCREEN -->
+<div id="staff-login-screen">
+  <div class="staff-login-box">
+    <div style="font-size:2.5rem;margin-bottom:8px;">🏥</div>
+    <h2>Circle City ABA</h2>
+    <p>Staff Portal — Sign in to continue</p>
+    <select id="sl-name">
+      <option value="">— Select your name —</option>
+    </select>
+    <input type="password" id="sl-pin" placeholder="Enter your PIN" maxlength="6" />
+    <button class="btn btn-primary" id="sl-btn">Sign In</button>
+    <div class="staff-login-error" id="sl-error"></div>
+    <div style="margin-top:16px;font-size:0.75rem;color:var(--muted);">Don't have a PIN? Ask your admin.</div>
+  </div>
+</div>
+
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <h1>Circle City ABA</h1>
     <p>Staff Portal</p>
+  </div>
+  <div id="staff-badge" style="display:none;">
+    <div class="badge-avatar" id="badge-avatar"></div>
+    <div>
+      <div class="badge-name" id="badge-name"></div>
+      <div class="badge-signout" id="badge-signout">Sign out</div>
+    </div>
   </div>
   <div class="nav-section-label">Daily</div>
   <div class="nav-item active" onclick="showPage('today')" id="nav-today">
@@ -508,10 +547,8 @@
     </div>
     <div class="card" style="margin-bottom:20px;border-left:4px solid var(--blue);padding:16px 22px;">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-        <span style="font-size:0.85rem;font-weight:700;color:var(--blue-dark);white-space:nowrap;">👤 You are:</span>
-        <select id="coverage-who" onchange="saveCoverageWho()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray);font-family:inherit;font-size:0.88rem;color:var(--text);background:#fff;min-width:180px;">
-          <option value="">— Select your name —</option>
-        </select>
+        <span style="font-size:0.85rem;font-weight:700;color:var(--blue-dark);white-space:nowrap;">👤 Responding as:</span>
+        <span id="coverage-who-display" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray);font-family:inherit;font-size:0.88rem;color:var(--text);background:#f8fbff;min-width:180px;display:inline-block;font-weight:700;"></span>
         <span id="coverage-who-note" style="font-size:0.78rem;color:var(--muted);"></span>
       </div>
     </div>
@@ -1001,8 +1038,8 @@ function renderStaff() {
   staffList.forEach((s, i) => {
     const card = document.createElement('div');
     card.className = 'rbt-card';
-    card.onclick = () => openRBTModal(i);
     const facts = s.facts;
+    const isOwnProfile = window._loggedInStaff && window._loggedInStaff === s.name;
     card.innerHTML = `
       <div class="avatar-circle" style="background:${colorFor(s.name)};width:52px;height:52px;font-size:1.3rem;">${initials(s.name)}</div>
       <div class="rbt-name">${s.name}</div>
@@ -1012,8 +1049,55 @@ function renderStaff() {
         <div class="fun-fact"><span class="label">🍕 Fave food</span><span class="val">${facts.fave_food||'—'}</span></div>
         <div class="fun-fact"><span class="label">⭐ Fun fact</span><span class="val">${facts.fun_fact||'—'}</span></div>
       </div>
-      <div style="margin-top:12px;font-size:0.78rem;color:var(--blue);font-weight:600;">Tap to see full profile →</div>`;
+      ${isOwnProfile ? '<div style="margin-top:10px;"><span style="display:inline-block;padding:5px 14px;border-radius:20px;background:var(--blue-light);color:var(--blue);font-size:0.76rem;font-weight:700;cursor:pointer;" data-edit-profile="'+i+'">✏️ Edit My Profile</span></div>' : ''}
+      <div style="margin-top:8px;font-size:0.78rem;color:var(--blue);font-weight:600;">Tap to see full profile →</div>`;
     grid.appendChild(card);
+  });
+  // Event delegation for edit-profile button
+  document.getElementById('rbt-grid').onclick = function(e) {
+    var btn = e.target.closest('[data-edit-profile]');
+    if (btn) { e.stopPropagation(); openEditOwnProfile(parseInt(btn.getAttribute('data-edit-profile'))); return; }
+    // card click
+    var card = e.target.closest('.rbt-card');
+    if (card) { var idx = Array.from(card.parentNode.children).indexOf(card); openRBTModal(idx); }
+  };
+}
+
+function openEditOwnProfile(i) {
+  const s = staffList[i];
+  const f = s.facts || {};
+  // Build a simple inline edit modal reusing the rbt-modal
+  document.getElementById('rbt-modal-content').innerHTML = `
+    <div style="text-align:left;">
+      <div class="avatar-circle" style="background:${colorFor(s.name)};width:52px;height:52px;font-size:1.2rem;margin:0 auto 12px;">${initials(s.name)}</div>
+      <div class="rbt-name" style="text-align:center;">${s.name}</div>
+      <div class="rbt-role" style="text-align:center;margin-bottom:16px;">${s.role}</div>
+      ${[
+        ['hometown','🏠 Hometown',f.hometown],
+        ['college','🎓 College',f.college],
+        ['fave_food','🍕 Favorite Food',f.fave_food],
+        ['fave_dessert','🍰 Favorite Dessert/Snack',f.fave_dessert],
+        ['hobbies','🎮 Hobbies',f.hobbies],
+        ['fave_show','📺 Favorite Show/Movie',f.fave_show],
+        ['fave_artist','🎵 Favorite Artist/Song',f.fave_artist],
+        ['fave_color','🎨 Favorite Color',f.fave_color],
+        ['fun_fact','⭐ Fun Fact',f.fun_fact],
+      ].map(([key,label,val])=>`<div style="margin-bottom:10px;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:3px;">${label}</div>
+        <input data-field="${key}" value="${(val||'').replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--gray);font-size:0.85rem;font-family:inherit;outline:none;" />
+      </div>`).join('')}
+      <button id="save-own-profile-btn" data-idx="${i}" style="width:100%;padding:11px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:0.95rem;font-weight:700;cursor:pointer;margin-top:8px;">💾 Save Profile</button>
+    </div>`;
+  document.getElementById('rbt-modal').classList.add('show');
+  document.getElementById('save-own-profile-btn').addEventListener('click', function() {
+    var idx = parseInt(this.getAttribute('data-idx'));
+    var inputs = document.querySelectorAll('#rbt-modal-content [data-field]');
+    inputs.forEach(function(inp) { staffList[idx].facts[inp.getAttribute('data-field')] = inp.value.trim(); });
+    saveData('cc_staff', staffList);
+    document.getElementById('rbt-modal').classList.remove('show');
+    renderStaff();
+    // Also sync to Supabase if available
+    showToast && showToast('Profile updated! ✅');
   });
 }
 
@@ -1707,6 +1791,93 @@ function renderCoverageRequests() {
   };
 }
 
+
+
+// ===================== STAFF LOGIN =====================
+const STAFF_SESSION_KEY = 'cc_staff_session';
+const STAFF_INACTIVITY_MS = 8 * 60 * 60 * 1000; // 8 hours - stays logged in all day
+
+function getStaffAccounts() {
+  return loadData('cc_staff_accounts', {});
+}
+
+function getCurrentStaff() {
+  var s = localStorage.getItem(STAFF_SESSION_KEY);
+  if (!s) return null;
+  try {
+    var obj = JSON.parse(s);
+    if (Date.now() - obj.ts > STAFF_INACTIVITY_MS) { localStorage.removeItem(STAFF_SESSION_KEY); return null; }
+    return obj;
+  } catch(e) { return null; }
+}
+
+function doStaffLogin() {
+  var name = document.getElementById('sl-name').value;
+  var pin = document.getElementById('sl-pin').value.trim();
+  var err = document.getElementById('sl-error');
+  if (!name) { err.textContent = 'Please select your name.'; return; }
+  if (!pin) { err.textContent = 'Please enter your PIN.'; return; }
+  var accounts = getStaffAccounts();
+  if (!accounts[name]) { err.textContent = 'No PIN set for your account. Ask your admin.'; return; }
+  if (accounts[name] !== pin) { err.textContent = 'Incorrect PIN. Try again.'; return; }
+  // Success
+  var session = { name: name, ts: Date.now() };
+  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
+  showStaffApp(name);
+}
+
+function doStaffLogout() {
+  localStorage.removeItem(STAFF_SESSION_KEY);
+  location.reload();
+}
+
+function showStaffApp(name) {
+  document.getElementById('staff-login-screen').style.display = 'none';
+  // Show badge in sidebar
+  var badge = document.getElementById('staff-badge');
+  badge.style.display = 'flex';
+  document.getElementById('badge-avatar').textContent = name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+  document.getElementById('badge-name').textContent = name;
+  document.getElementById('badge-signout').onclick = doStaffLogout;
+  // Set coverage-who
+  currentCoverageUser = name;
+  saveData('cc_coverage_user', name);
+  var disp = document.getElementById('coverage-who-display');
+  if (disp) disp.textContent = name;
+  var note = document.getElementById('coverage-who-note');
+  if (note) note.textContent = 'Your responses will be saved under this name.';
+  // Re-render if coverage tab is open
+  renderCoverageRequests();
+  // Store for RBT profile editing
+  window._loggedInStaff = name;
+}
+
+function populateCoverageWho() {
+  // No-op — name comes from login now; display is already set in showStaffApp
+}
+
+function saveCoverageWho() {
+  // No-op — kept for compatibility
+}
+
+function tryStaffAutoLogin() {
+  // Populate name dropdown from staffList
+  var sel = document.getElementById('sl-name');
+  var accounts = getStaffAccounts();
+  var names = staffList.map(function(s){ return s.name; }).sort();
+  sel.innerHTML = '<option value="">— Select your name —</option>'
+    + names.map(function(n){
+        return '<option value="' + n + '"' + (accounts[n] ? '' : ' style="color:#aaa;"') + '>' + n + (accounts[n] ? '' : ' (no PIN)') + '</option>';
+      }).join('');
+  // Wire up button and enter key
+  document.getElementById('sl-btn').addEventListener('click', doStaffLogin);
+  document.getElementById('sl-pin').addEventListener('keydown', function(e){ if(e.key==='Enter') doStaffLogin(); });
+  // Check existing session
+  var session = getCurrentStaff();
+  if (session) {
+    showStaffApp(session.name);
+  }
+}
 
 // ===================== INIT =====================
 async function fetchShoutoutsFromSupabase() {
