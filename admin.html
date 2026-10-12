@@ -166,8 +166,9 @@
     <span class="icon">💬</span><span>Feedback</span>
     <span class="badge-new" id="unread-badge" style="display:none;margin-left:auto;">New</span>
   </div>
-  <div class="nav-item" onclick="showPage('timeline-mgmt')" id="nav-timeline-mgmt"><span class="icon">🕐</span><span>Daily Timeline</span></div>
+  <div class="nav-item" onclick="showPage('timeline-mgmt')" id="nav-timeline-mgmt"><span class="icon">📆</span><span>Weekly Schedule</span></div>
   <div class="nav-item" onclick="showPage('calendar-mgmt')" id="nav-calendar-mgmt"><span class="icon">🗓️</span><span>Team Calendar</span></div>
+  <div class="nav-item" onclick="showPage('coverage-mgmt')" id="nav-coverage-mgmt"><span class="icon">🚨</span><span>Coverage Requests</span></div>
   <div class="nav-item" onclick="showPage('reminders-mgmt')" id="nav-reminders-mgmt"><span class="icon">📌</span><span>Reminders</span></div>
   <div class="sidebar-footer">
     <div>Logged in as <strong>Admin</strong></div>
@@ -304,7 +305,7 @@
   <!-- TIMELINE MANAGEMENT -->
   <section class="page-section" id="page-timeline-mgmt">
     <div class="topbar">
-      <div class="topbar-title"><h2>🕐 Daily Timeline</h2><p>Edit today's clinical schedule</p></div>
+      <div class="topbar-title"><h2>📆 Weekly Schedule</h2><p>Edit the weekly clinical schedule</p></div>
       <button class="btn btn-primary" onclick="saveTimeline()">Save Timeline</button>
     </div>
     <div class="grid-2">
@@ -363,9 +364,73 @@
     <div class="grid-2" id="reminders-admin-grid"></div>
   </section>
 
+
+  <!-- COVERAGE REQUESTS MANAGEMENT -->
+  <section class="page-section" id="page-coverage-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>🚨 Coverage Requests</h2><p>Post and manage open coverage shifts for staff</p></div>
+      <button class="btn btn-coral" onclick="openModal('modal-coverage')">+ New Coverage Request</button>
+    </div>
+    <div id="coverage-admin-list" style="display:flex;flex-direction:column;gap:14px;"></div>
+  </section>
+
 </main>
 
 <!-- MODALS -->
+<!-- COVERAGE REQUEST MODAL -->
+<div class="modal-overlay" id="modal-coverage" onclick="closeModalOnBg(event,'modal-coverage')">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header"><span>🚨 New Coverage Request</span><button class="modal-close" onclick="closeModal('modal-coverage')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="form-label">Client Name</label>
+        <input id="cov-client" class="form-input" placeholder="e.g. AnSa" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Day</label>
+          <select id="cov-day" class="form-input">
+            <option>Today</option>
+            <option>Monday</option>
+            <option>Tuesday</option>
+            <option>Wednesday</option>
+            <option>Thursday</option>
+            <option>Friday</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Urgent?</label>
+          <select id="cov-urgent" class="form-input">
+            <option value="false">No</option>
+            <option value="true">Yes — Urgent</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Time</label>
+        <input id="cov-time" class="form-input" placeholder="e.g. 1:00–5:00 PM" />
+      </div>
+      <div>
+        <label class="form-label">Reason</label>
+        <input id="cov-reason" class="form-input" placeholder="e.g. Staff callout — John called out sick" />
+      </div>
+      <div>
+        <label class="form-label">Recommended Staff <span style="font-weight:400;color:var(--muted);">(comma-separated)</span></label>
+        <input id="cov-recommended" class="form-input" placeholder="e.g. Sarah, John, Emma" />
+      </div>
+      <div>
+        <label class="form-label">Note <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input id="cov-note" class="form-input" placeholder="e.g. Sarah has worked with this client before" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-coverage')">Cancel</button>
+      <button class="btn btn-coral" onclick="postCoverageRequest()">Post Request</button>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal-overlay" id="modal-assignment" onclick="closeModalOnBg(event,'modal-assignment')">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('modal-assignment')">×</button>
@@ -728,6 +793,7 @@ function doLogout() {
 function showPage(id) {
   document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(id === 'coverage-mgmt') fetchAdminCoverage();
   document.getElementById('page-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
 }
@@ -736,6 +802,124 @@ function showPage(id) {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 function closeModalOnBg(e, id) { if(e.target===document.getElementById(id)) closeModal(id); }
+
+// ===================== COVERAGE REQUESTS =====================
+var adminCoverageRequests = [];
+
+async function fetchAdminCoverage() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?order=created_at.desc', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    var data = await res.json();
+    if(Array.isArray(data) && data.length) {
+      adminCoverageRequests = data;
+    }
+  } catch(e) {}
+  renderAdminCoverage();
+}
+
+async function postCoverageRequest() {
+  var client = document.getElementById('cov-client').value.trim();
+  var day = document.getElementById('cov-day').value;
+  var time = document.getElementById('cov-time').value.trim();
+  var reason = document.getElementById('cov-reason').value.trim();
+  var urgent = document.getElementById('cov-urgent').value === 'true';
+  var recRaw = document.getElementById('cov-recommended').value;
+  var recommended = recRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var note = document.getElementById('cov-note').value.trim();
+
+  if(!client || !time) { showToast('Client name and time are required.'); return; }
+
+  var request = {
+    id: 'cr_' + Date.now(),
+    status: 'open',
+    client: client,
+    day: day,
+    time: time,
+    reason: reason,
+    urgent: urgent,
+    recommended: recommended,
+    note: note,
+    created_at: new Date().toISOString()
+  };
+
+  // Save to Supabase
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/coverage_requests', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(request)
+    });
+  } catch(e) {}
+
+  adminCoverageRequests.unshift(request);
+  closeModal('modal-coverage');
+  // Clear form
+  ['cov-client','cov-time','cov-reason','cov-recommended','cov-note'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('cov-urgent').value = 'false';
+  renderAdminCoverage();
+  showToast('Coverage request posted! Staff will see it now.');
+}
+
+async function closeCoverageRequest(id) {
+  if(!confirm('Mark this request as filled/closed?')) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'closed' })
+    });
+  } catch(e) {}
+  adminCoverageRequests = adminCoverageRequests.map(function(r){ return r.id === id ? Object.assign({}, r, {status:'closed'}) : r; });
+  renderAdminCoverage();
+  showToast('Request marked as filled.');
+}
+
+async function deleteCoverageRequest(id) {
+  if(!confirm('Delete this coverage request permanently?')) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+  } catch(e) {}
+  adminCoverageRequests = adminCoverageRequests.filter(function(r){ return r.id !== id; });
+  renderAdminCoverage();
+  showToast('Request deleted.');
+}
+
+function renderAdminCoverage() {
+  var el = document.getElementById('coverage-admin-list');
+  if(!el) return;
+  if(!adminCoverageRequests.length) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:32px;color:var(--muted);">No coverage requests yet.<br><span style="font-size:0.82rem;opacity:0.7;">Click "+ New Coverage Request" to post one.</span></div>';
+    return;
+  }
+  el.innerHTML = adminCoverageRequests.map(function(r) {
+    var isClosed = r.status === 'closed';
+    var borderColor = r.urgent ? '#FF6B6B' : '#F5A623';
+    var recHtml = (r.recommended && r.recommended.length)
+      ? '<div style="margin-top:8px;font-size:0.8rem;color:var(--muted);">Recommended: <strong>' + r.recommended.join(', ') + '</strong></div>'
+      : '';
+    var noteHtml = r.note ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:4px;font-style:italic;">' + r.note + '</div>' : '';
+    return '<div class="card" style="border-left:4px solid ' + borderColor + ';opacity:' + (isClosed ? '0.55' : '1') + ';">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
+      + '<div>'
+      + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:' + borderColor + ';margin-bottom:4px;">' + (r.urgent ? '🚨 Urgent — ' : '📋 ') + 'Coverage Needed' + (isClosed ? ' <span style="color:#aaa;">(Filled)</span>' : '') + '</div>'
+      + '<div style="font-size:1rem;font-weight:700;color:var(--text);">Client: ' + r.client + '</div>'
+      + '<div style="font-size:0.85rem;color:var(--muted);margin-top:2px;">📅 ' + r.day + ' &nbsp;|&nbsp; 🕐 ' + r.time + '</div>'
+      + (r.reason ? '<div style="margin-top:6px;font-size:0.8rem;background:#f5f5f7;padding:4px 10px;border-radius:6px;display:inline-block;">' + r.reason + '</div>' : '')
+      + recHtml + noteHtml
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">'
+      + (!isClosed ? '<button class="btn btn-green btn-sm" onclick="closeCoverageRequest(' + JSON.stringify(r.id) + ')">✓ Mark Filled</button>' : '')
+      + '<button class="btn btn-sm" style="background:#fff;border:1px solid #ddd;color:var(--muted);" onclick="deleteCoverageRequest(' + JSON.stringify(r.id) + ')">🗑 Delete</button>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
 
 // ===================== TOAST =====================
 function showToast(msg) {
@@ -763,6 +947,7 @@ function renderAll() {
   fetchTrainingFromSupabase();
   fetchCalendarFromSupabase();
   fetchTimelineFromSupabase();
+  fetchAdminCoverage();
   fetchRemindersFromSupabase();
   fetchFeedbackFromSupabase();
 }
