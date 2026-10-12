@@ -203,7 +203,7 @@
   <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
   <div class="nav-section-label">Manage</div>
   <div class="nav-item" onclick="showPage('assignments')" id="nav-assignments"><span class="icon">📋</span><span>Today's Assignments</span></div>
-  <div class="nav-item" onclick="showPage('rbt-mgmt')" id="nav-rbt-mgmt"><span class="icon">👥</span><span>RBT Profiles</span></div>
+  <div class="nav-item" onclick="showPage('rbt-mgmt')" id="nav-rbt-mgmt"><span class="icon">👥</span><span>Staff Profiles</span></div>
   <div class="nav-item" onclick="showPage('training-mgmt')" id="nav-training-mgmt"><span class="icon">🎓</span><span>Training Pairs</span></div>
   <div class="nav-section-label">Celebrate</div>
   <div class="nav-item" onclick="showPage('shoutouts-mgmt')" id="nav-shoutouts-mgmt"><span class="icon">⭐</span><span>Shoutouts</span></div>
@@ -267,7 +267,7 @@
   <!-- RBT MANAGEMENT -->
   <section class="page-section" id="page-rbt-mgmt">
     <div class="topbar">
-      <div class="topbar-title"><h2>👥 RBT Profiles</h2><p>Manage staff profiles and fun facts</p></div>
+      <div class="topbar-title"><h2>👥 Staff Profiles</h2><p>Manage staff profiles and fun facts</p></div>
       <button class="btn btn-green" onclick="openModal('modal-rbt')">+ Add RBT</button>
     </div>
     <div class="card">
@@ -492,7 +492,7 @@
 <div class="modal-overlay" id="modal-rbt" onclick="closeModalOnBg(event,'modal-rbt')">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('modal-rbt')">×</button>
-    <h3>Add / Edit RBT Profile</h3>
+    <h3>Add / Edit Staff Profile</h3>
     <input type="hidden" id="rbt-edit-idx" value="-1">
     <div class="form-row">
       <div class="form-group"><label>Full Name</label><input type="text" id="rbt-name"></div>
@@ -1363,7 +1363,7 @@ function saveRBT() {
   saveData('cc_staff',staffList); renderRBTTable(); closeModal('modal-rbt');
   document.getElementById('rbt-edit-idx').value=-1; showToast('Profile saved!');
 }
-function deleteRBT(i) { if(!confirm('Delete this RBT profile?')) return; staffList.splice(i,1); saveData('cc_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
+function deleteRBT(i) { if(!confirm('Delete this Staff Profile?')) return; staffList.splice(i,1); saveData('cc_staff',staffList); renderRBTTable(); showToast('Profile deleted.'); }
 
 // ===================== SCHEDULES =====================
 function renderScheduleSelect() {
