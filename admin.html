@@ -1016,10 +1016,12 @@ function renderAdminCoverage() {
   var el = document.getElementById('coverage-admin-list');
   if(!el) return;
   if(!adminCoverageRequests.length) {
-    el.innerHTML = '<div class="card" style="text-align:center;padding:32px;color:var(--muted);">No coverage requests yet.<br><span style="font-size:0.82rem;opacity:0.7;">Click "+ New Coverage Request" to post one.</span></div>';
+    el.innerHTML = '<div class="card" style="text-align:center;padding:32px;color:var(--muted);">No coverage requests yet.</div>';
     return;
   }
-  el.innerHTML = adminCoverageRequests.map(function(r) {
+
+  // Build cards without inline onclick — use data attributes + event delegation
+  el.innerHTML = adminCoverageRequests.map(function(r, idx) {
     var isClosed = r.status === 'closed';
     var borderColor = r.urgent ? '#FF6B6B' : '#F5A623';
     var recHtml = (r.recommended && r.recommended.length)
@@ -1036,12 +1038,23 @@ function renderAdminCoverage() {
       + recHtml + noteHtml
       + '</div>'
       + '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">'
-      + (!isClosed ? '<button class="btn btn-green btn-sm" onclick="closeCoverageRequest(' + JSON.stringify(r.id) + ')">✓ Mark Filled</button>' : '')
-      + '<button class="btn btn-sm" style="background:#fff;border:1px solid #ddd;color:var(--muted);" onclick="deleteCoverageRequest(' + JSON.stringify(r.id) + ')">🗑 Delete</button>'
+      + (!isClosed ? '<button class="btn btn-green btn-sm" data-action="fill" data-idx="' + idx + '">&#10003; Mark Filled</button>' : '')
+      + '<button class="btn btn-sm" data-action="delete" data-idx="' + idx + '" style="background:#fff;border:1.5px solid #FF6B6B;color:#c0392b;">&#128465; Delete</button>'
       + '</div>'
       + '</div>'
       + '</div>';
   }).join('');
+
+  // Event delegation — one listener on the container
+  el.onclick = function(e) {
+    var btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    var idx = parseInt(btn.getAttribute('data-idx'), 10);
+    var r = adminCoverageRequests[idx];
+    if(!r) return;
+    if(btn.getAttribute('data-action') === 'fill') closeCoverageRequest(r.id);
+    if(btn.getAttribute('data-action') === 'delete') deleteCoverageRequest(r.id);
+  };
 }
 
 // ===================== TOAST =====================
