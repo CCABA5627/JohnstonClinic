@@ -565,7 +565,10 @@
         <h4>🔗 Live from CCABA Scheduling</h4>
         <p>Reflects the current weekly view. Last synced: <span id="weekly-sync-time">—</span></p>
       </div>
-      <div class="sync-pill" id="weekly-sync-status">Loading...</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button onclick="fetchWeeklySchedule()" style="font-size:0.75rem;padding:5px 12px;border-radius:20px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;">↻ Refresh</button>
+        <div class="sync-pill" id="weekly-sync-status">Loading...</div>
+      </div>
     </div>
     <div class="card" id="weekly-schedule-card">
       <div id="weekly-schedule-body" style="font-size:0.88rem;color:var(--muted);padding:20px 0;text-align:center;">Loading weekly schedule...</div>
@@ -2047,6 +2050,10 @@ function init() {
   fetchRemindersFromSupabase();
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
   setInterval(fetchWeeklySchedule, 5 * 60 * 1000);
+  // Refresh weekly schedule when user returns to this tab
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') fetchWeeklySchedule();
+  });
   // Render with defaults immediately while fetches happen
   renderStaff();
   renderSchedules();
