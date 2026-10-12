@@ -397,15 +397,9 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
-          <label class="form-label">Day</label>
-          <select id="cov-day" class="form-input">
-            <option>Today</option>
-            <option>Monday</option>
-            <option>Tuesday</option>
-            <option>Wednesday</option>
-            <option>Thursday</option>
-            <option>Friday</option>
-          </select>
+          <label class="form-label">Date</label>
+          <input type="date" id="cov-day" class="form-input" />
+          <script>document.getElementById('cov-day').value = new Date().toISOString().slice(0,10);</script>
         </div>
         <div>
           <label class="form-label">Urgent?</label>
@@ -997,7 +991,9 @@ async function fetchAdminCoverage() {
 
 async function postCoverageRequest() {
   var client = document.getElementById('cov-client').value.trim();
-  var day = document.getElementById('cov-day').value;
+  var dayRaw = document.getElementById('cov-day').value;
+  // Format as "Mon, Oct 13" for display
+  var day = dayRaw ? new Date(dayRaw + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) : 'Today';
   var time = document.getElementById('cov-time').value.trim();
   var reason = document.getElementById('cov-reason').value.trim();
   var urgent = document.getElementById('cov-urgent').value === 'true';
@@ -1035,6 +1031,7 @@ async function postCoverageRequest() {
   // Clear form
   ['cov-client','cov-time','cov-reason','cov-recommended','cov-note'].forEach(function(id){ document.getElementById(id).value = ''; });
   document.getElementById('cov-urgent').value = 'false';
+  document.getElementById('cov-day').value = new Date().toISOString().slice(0,10);
   renderAdminCoverage();
   showToast('Coverage request posted! Staff will see it now.');
 }
