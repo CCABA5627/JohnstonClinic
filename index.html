@@ -1418,52 +1418,91 @@ async function fetchWeeklySchedule() {
 
     const todayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
 
-    // Determine which slots have any data so we can hide fully empty rows
-    var slotHasData = TIME_SLOTS.map(function(_, si) {
-      return DAYS_ORDER.some(function(d) { return byDaySlot[d][si] && byDaySlot[d][si].length > 0; });
+    // Build a master ordered list of clients per time slot across ALL days
+    // so each client always appears in the same sub-row position
+    var slotClientOrder = {}; // si -> [clientName, ...]
+    TIME_SLOTS.forEach(function(_, si) {
+      var seen = [];
+      DAYS_ORDER.forEach(function(d) {
+        (byDaySlot[d][si] || []).forEach(function(r) {
+          var key = String(r.client_name || r.clients || 'Client').trim();
+          if(seen.indexOf(key) === -1) seen.push(key);
+        });
+      });
+      slotClientOrder[si] = seen;
     });
 
-    var gridCols = 'auto repeat(5, 1fr)';
+    // Determine which slots have any data
+    var slotHasData = TIME_SLOTS.map(function(_, si) {
+      return slotClientOrder[si].length > 0;
+    });
+
     var borderColor = '#e0e0e0';
 
     var html = '<div style="overflow-x:auto;">'
-      + '<div style="display:grid;grid-template-columns:' + gridCols + ';min-width:520px;border:1px solid ' + borderColor + ';border-radius:10px;overflow:hidden;">';
+      + '<table style="width:100%;min-width:520px;border-collapse:collapse;border:1px solid ' + borderColor + ';border-radius:10px;overflow:hidden;font-size:0.72rem;">';
 
     // Header row
-    html += '<div style="background:#f7f7f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">Time</div>';
+    html += '<thead><tr>'
+      + '<th style="background:#f7f7f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';width:60px;text-align:left;">Time</th>';
     DAYS_ORDER.forEach(function(d) {
       var isToday = d === todayName;
-      html += '<div style="background:' + (isToday ? '#EAF2FD' : '#f7f7f9') + ';padding:8px 6px;font-size:0.8rem;font-weight:700;color:' + (isToday ? 'var(--blue)' : 'var(--text)') + ';text-align:center;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">'
-        + d + (isToday ? '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">today</span>' : '') + '</div>';
+      html += '<th style="background:' + (isToday ? '#EAF2FD' : '#f7f7f9') + ';padding:8px 6px;font-size:0.8rem;font-weight:700;color:' + (isToday ? 'var(--blue)' : 'var(--text)') + ';text-align:center;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">'
+        + d + (isToday ? '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">today</span>' : '') + '</th>';
     });
+    html += '</tr></thead><tbody>';
 
-    // Time rows
     TIME_SLOTS.forEach(function(slot, si) {
-      if(!slotHasData[si]) return; // skip fully empty rows
-      var isLast = si === TIME_SLOTS.length - 1;
-      var rowBorder = isLast ? '' : 'border-bottom:1px solid ' + borderColor + ';';
+      if(!slotHasData[si]) return;
+      var clients = slotClientOrder[si]; // ordered list of clients for this slot
+      var isLastSlot = (TIME_SLOTS.slice(si+1).every(function(_,i2) { return !slotHasData[si+1+i2]; }));
+      var slotBorder = isLastSlot ? '' : 'border-bottom:2px solid ' + borderColor + ';';
 
-      // Time label cell
-      html += '<div style="padding:6px 10px;font-size:0.72rem;font-weight:600;color:var(--muted);white-space:nowrap;' + rowBorder + 'border-right:1px solid ' + borderColor + ';background:#fafafa;vertical-align:top;display:flex;align-items:flex-start;padding-top:8px;">' + slot + '</div>';
-
+      // Build a lookup: day -> clientName -> entry
+      var dayClientMap = {};
       DAYS_ORDER.forEach(function(d) {
-        var isToday = d === todayName;
-        var entries = byDaySlot[d][si] || [];
-        html += '<div style="padding:4px 5px;' + rowBorder + 'border-right:1px solid ' + borderColor + ';background:' + (isToday ? 'rgba(74,144,217,0.03)' : '#fff') + ';min-height:52px;vertical-align:top;">';
-        entries.forEach(function(r) {
-          var clientKey = r.client_name || r.clients || 'Client';
-          var col = clientColor(clientKey);
-          html += '<div style="background:' + col.bg + ';border-left:3px solid ' + col.border + ';border-radius:5px;padding:4px 6px;margin-bottom:3px;font-size:0.72rem;">'
-            + '<div style="font-weight:700;color:' + col.text + ';margin-bottom:1px;">' + clientKey + '</div>'
-            + '<div style="color:#555;font-size:0.68rem;">👤 ' + (r.staff_name || '—') + '</div>'
-            + '<div style="color:#888;font-size:0.65rem;">' + (r.start_time || '') + (r.end_time ? '–' + r.end_time : '') + '</div>'
-            + '</div>';
+        dayClientMap[d] = {};
+        (byDaySlot[d][si] || []).forEach(function(r) {
+          var key = String(r.client_name || r.clients || 'Client').trim();
+          dayClientMap[d][key] = r;
         });
-        html += '</div>';
+      });
+
+      clients.forEach(function(clientKey, ci) {
+        var isFirstClient = ci === 0;
+        var isLastClient = ci === clients.length - 1;
+        var subBorder = isLastClient ? slotBorder : 'border-bottom:1px dashed #ebebeb;';
+        var col = clientColor(clientKey);
+
+        html += '<tr>';
+
+        // Time label — only on first sub-row, spans all client rows for this slot
+        if(isFirstClient) {
+          html += '<td rowspan="' + clients.length + '" style="padding:6px 8px;font-size:0.7rem;font-weight:700;color:var(--muted);white-space:nowrap;border-right:1px solid ' + borderColor + ';' + slotBorder + 'background:#fafafa;vertical-align:top;padding-top:10px;">' + slot + '</td>';
+        }
+
+        // One cell per day
+        DAYS_ORDER.forEach(function(d) {
+          var isToday = d === todayName;
+          var entry = dayClientMap[d][clientKey];
+          html += '<td style="padding:3px 5px;' + subBorder + 'border-right:1px solid ' + borderColor + ';background:' + (isToday ? 'rgba(74,144,217,0.03)' : '#fff') + ';vertical-align:middle;">';
+          if(entry) {
+            html += '<div style="background:' + col.bg + ';border-left:3px solid ' + col.border + ';border-radius:5px;padding:4px 6px;">'
+              + '<div style="font-weight:700;color:' + col.text + ';">' + clientKey + '</div>'
+              + '<div style="color:#555;font-size:0.68rem;">👤 ' + (entry.staff_name || '—') + '</div>'
+              + '<div style="color:#888;font-size:0.65rem;">' + (entry.start_time || '') + (entry.end_time ? '–' + entry.end_time : '') + '</div>'
+              + '</div>';
+          } else {
+            html += '<div style="height:36px;"></div>';
+          }
+          html += '</td>';
+        });
+
+        html += '</tr>';
       });
     });
 
-    html += '</div></div>';
+    html += '</tbody></table></div>';
     bodyEl.innerHTML = html;
 
     if(statusEl) { statusEl.textContent = 'Live from Scheduling'; statusEl.style.background = 'rgba(107,191,127,0.25)'; }
