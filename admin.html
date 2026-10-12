@@ -375,6 +375,11 @@
       <div class="topbar-title"><h2>🚨 Coverage Requests</h2><p>Post and manage open coverage shifts for staff</p></div>
       <button class="btn btn-coral" onclick="openModal('modal-coverage')">+ New Coverage Request</button>
     </div>
+    <div id="coverage-setup-banner" style="display:none;background:#FFF8EC;border:1.5px solid #F5A623;border-radius:12px;padding:18px 22px;margin-bottom:20px;">
+      <div style="font-weight:700;color:#a06a00;margin-bottom:6px;">⚠️ One-time setup needed</div>
+      <div style="font-size:0.85rem;color:#7a5000;margin-bottom:14px;">The Supabase database table for coverage requests hasn't been created yet. Click below to set it up automatically — this only needs to happen once.</div>
+      <button class="btn btn-green" onclick="setupCoverageTables()" id="setup-coverage-btn">🔧 Create Database Tables</button>
+    </div>
     <div id="coverage-admin-list" style="display:flex;flex-direction:column;gap:14px;"></div>
   </section>
 
@@ -810,10 +815,109 @@ function closeModalOnBg(e, id) { if(e.target===document.getElementById(id)) clos
 // ===================== COVERAGE REQUESTS =====================
 var adminCoverageRequests = [];
 
+async function setupCoverageTables() {
+  var btn = document.getElementById('setup-coverage-btn');
+  if(btn) { btn.textContent = 'Setting up...'; btn.disabled = true; }
+
+  // Use Supabase's REST API to run SQL via the pg endpoint
+  var sql = `
+    create table if not exists coverage_requests (
+      id text primary key,
+      status text default 'open',
+      client text,
+      day text,
+      time text,
+      reason text,
+      urgent boolean default false,
+      recommended jsonb,
+      note text,
+      created_at timestamptz default now()
+    );
+    alter table coverage_requests enable row level security;
+    do $$ begin
+      if not exists (select 1 from pg_policies where tablename='coverage_requests' and policyname='Allow all') then
+        create policy "Allow all" on coverage_requests for all using (true) with check (true);
+      end if;
+    end $$;
+    create table if not exists coverage_responses (
+      id bigserial primary key,
+      request_id text references coverage_requests(id) on delete cascade,
+      responder_name text,
+      response text,
+      responded_at timestamptz default now()
+    );
+    alter table coverage_responses enable row level security;
+    do $$ begin
+      if not exists (select 1 from pg_policies where tablename='coverage_responses' and policyname='Allow all') then
+        create policy "Allow all" on coverage_responses for all using (true) with check (true);
+      end if;
+    end $$;
+  `;
+
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/exec_sql', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: sql })
+    });
+    // Most Supabase free plans don't expose exec_sql — try creating the table via a dummy insert instead
+    if(!res.ok) throw new Error('exec_sql not available');
+    document.getElementById('coverage-setup-banner').style.display = 'none';
+    showToast('Database tables created! ✓');
+    fetchAdminCoverage();
+  } catch(e) {
+    // Fallback: try to insert a test row to see if table exists
+    var testRes = await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?limit=1', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    if(testRes.ok) {
+      // Table already exists
+      document.getElementById('coverage-setup-banner').style.display = 'none';
+      showToast('Tables already exist — you are good to go! ✓');
+      fetchAdminCoverage();
+    } else {
+      // Table truly doesn't exist — show SQL instructions
+      if(btn) { btn.textContent = 'Show Setup SQL'; btn.disabled = false; btn.onclick = showSetupSQL; }
+      showToast('Auto-setup not available — click "Show Setup SQL" to copy the SQL.', true);
+    }
+  }
+}
+
+function showSetupSQL() {
+  var lines = [
+    "create table if not exists coverage_requests (",
+    "  id text primary key,",
+    "  status text default 'open',",
+    "  client text, day text, time text, reason text,",
+    "  urgent boolean default false,",
+    "  recommended jsonb, note text,",
+    "  created_at timestamptz default now()",
+    ");",
+    "alter table coverage_requests enable row level security;",
+    "create policy \"Allow all\" on coverage_requests for all using (true) with check (true);",
+    "",
+    "create table if not exists coverage_responses (",
+    "  id bigserial primary key,",
+    "  request_id text references coverage_requests(id) on delete cascade,",
+    "  responder_name text, response text,",
+    "  responded_at timestamptz default now()",
+    ");",
+    "alter table coverage_responses enable row level security;",
+    "create policy \"Allow all\" on coverage_responses for all using (true) with check (true);"
+  ];
+  var sql = lines.join("\n");
+  navigator.clipboard.writeText(sql).then(function() {
+    showToast("SQL copied! Paste it in Supabase → SQL Editor → Run.");
+  }).catch(function() {
+    prompt("Copy this SQL and paste it in Supabase → SQL Editor → Run:", sql);
+  });
+}
+
 async function fetchAdminCoverage() {
   // Always load from localStorage first so UI is instant
   var local = loadData('cc_admin_coverage', []);
   if(local.length) adminCoverageRequests = local;
+  var banner = document.getElementById('coverage-setup-banner');
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?order=created_at.desc', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
@@ -823,9 +927,15 @@ async function fetchAdminCoverage() {
       if(Array.isArray(data)) {
         adminCoverageRequests = data;
         saveData('cc_admin_coverage', data);
+        if(banner) banner.style.display = 'none';
       }
+    } else {
+      // Table likely doesn't exist
+      if(banner) banner.style.display = 'block';
     }
-  } catch(e) {}
+  } catch(e) {
+    if(banner) banner.style.display = 'block';
+  }
   renderAdminCoverage();
 }
 
@@ -874,7 +984,6 @@ async function postCoverageRequest() {
 }
 
 async function closeCoverageRequest(id) {
-  if(!confirm('Mark this request as filled/closed?')) return;
   try {
     await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?id=eq.' + encodeURIComponent(id), {
       method: 'PATCH',
@@ -889,17 +998,18 @@ async function closeCoverageRequest(id) {
 }
 
 async function deleteCoverageRequest(id) {
-  if(!confirm('Delete this coverage request permanently?')) return;
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?id=eq.' + encodeURIComponent(id), {
-      method: 'DELETE',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-    });
-  } catch(e) {}
+  // Remove from local state immediately — no confirm() needed (browser blocks it in some contexts)
   adminCoverageRequests = adminCoverageRequests.filter(function(r){ return r.id !== id; });
   saveData('cc_admin_coverage', adminCoverageRequests);
   renderAdminCoverage();
   showToast('Request deleted.');
+  // Also delete from Supabase in background
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/coverage_requests?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+  } catch(e) {}
 }
 
 function renderAdminCoverage() {
