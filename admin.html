@@ -115,7 +115,13 @@
 
   /* CALENDAR ADMIN */
   .cal-event-list { list-style: none; }
+  .form-label { display:block; font-size:0.8rem; font-weight:700; color:var(--text); margin-bottom:5px; }
+  .form-input { width:100%; padding:10px 14px; border-radius:10px; border:1.5px solid var(--gray); font-family:inherit; font-size:0.88rem; color:var(--text); background:#fff; outline:none; }
+  .form-input:focus { border-color:var(--blue); }
   .cal-event-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray); font-size: 0.88rem; }
+  .form-label { display:block; font-size:0.8rem; font-weight:700; color:var(--text); margin-bottom:5px; }
+  .form-input { width:100%; padding:10px 14px; border-radius:10px; border:1.5px solid var(--gray); font-family:inherit; font-size:0.88rem; color:var(--text); background:#fff; outline:none; }
+  .form-input:focus { border-color:var(--blue); }
   .cal-event-item:last-child { border-bottom: none; }
 
   /* MODAL */
@@ -157,7 +163,6 @@
   <div class="nav-section-label">Manage</div>
   <div class="nav-item" onclick="showPage('assignments')" id="nav-assignments"><span class="icon">📋</span><span>Today's Assignments</span></div>
   <div class="nav-item" onclick="showPage('rbt-mgmt')" id="nav-rbt-mgmt"><span class="icon">👥</span><span>RBT Profiles</span></div>
-  <div class="nav-item" onclick="showPage('schedule-mgmt')" id="nav-schedule-mgmt"><span class="icon">📅</span><span>Staff Schedules</span></div>
   <div class="nav-item" onclick="showPage('training-mgmt')" id="nav-training-mgmt"><span class="icon">🎓</span><span>Training Pairs</span></div>
   <div class="nav-section-label">Celebrate</div>
   <div class="nav-item" onclick="showPage('shoutouts-mgmt')" id="nav-shoutouts-mgmt"><span class="icon">⭐</span><span>Shoutouts</span></div>
@@ -166,7 +171,6 @@
     <span class="icon">💬</span><span>Feedback</span>
     <span class="badge-new" id="unread-badge" style="display:none;margin-left:auto;">New</span>
   </div>
-  <div class="nav-item" onclick="showPage('timeline-mgmt')" id="nav-timeline-mgmt"><span class="icon">📆</span><span>Weekly Schedule</span></div>
   <div class="nav-item" onclick="showPage('calendar-mgmt')" id="nav-calendar-mgmt"><span class="icon">🗓️</span><span>Team Calendar</span></div>
   <div class="nav-item" onclick="showPage('coverage-mgmt')" id="nav-coverage-mgmt"><span class="icon">🚨</span><span>Coverage Requests</span></div>
   <div class="nav-item" onclick="showPage('reminders-mgmt')" id="nav-reminders-mgmt"><span class="icon">📌</span><span>Reminders</span></div>
@@ -807,13 +811,19 @@ function closeModalOnBg(e, id) { if(e.target===document.getElementById(id)) clos
 var adminCoverageRequests = [];
 
 async function fetchAdminCoverage() {
+  // Always load from localStorage first so UI is instant
+  var local = loadData('cc_admin_coverage', []);
+  if(local.length) adminCoverageRequests = local;
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/coverage_requests?order=created_at.desc', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
-    var data = await res.json();
-    if(Array.isArray(data) && data.length) {
-      adminCoverageRequests = data;
+    if(res.ok) {
+      var data = await res.json();
+      if(Array.isArray(data)) {
+        adminCoverageRequests = data;
+        saveData('cc_admin_coverage', data);
+      }
     }
   } catch(e) {}
   renderAdminCoverage();
@@ -854,6 +864,7 @@ async function postCoverageRequest() {
   } catch(e) {}
 
   adminCoverageRequests.unshift(request);
+  saveData('cc_admin_coverage', adminCoverageRequests);
   closeModal('modal-coverage');
   // Clear form
   ['cov-client','cov-time','cov-reason','cov-recommended','cov-note'].forEach(function(id){ document.getElementById(id).value = ''; });
@@ -872,6 +883,7 @@ async function closeCoverageRequest(id) {
     });
   } catch(e) {}
   adminCoverageRequests = adminCoverageRequests.map(function(r){ return r.id === id ? Object.assign({}, r, {status:'closed'}) : r; });
+  saveData('cc_admin_coverage', adminCoverageRequests);
   renderAdminCoverage();
   showToast('Request marked as filled.');
 }
@@ -885,6 +897,7 @@ async function deleteCoverageRequest(id) {
     });
   } catch(e) {}
   adminCoverageRequests = adminCoverageRequests.filter(function(r){ return r.id !== id; });
+  saveData('cc_admin_coverage', adminCoverageRequests);
   renderAdminCoverage();
   showToast('Request deleted.');
 }
@@ -975,12 +988,25 @@ function renderDashboard() {
 }
 
 // ===================== ASSIGNMENTS =====================
+function parseTimeToMinutes(t) {
+  if(!t) return 0;
+  var m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if(!m) return 0;
+  var h = parseInt(m[1]); var min = parseInt(m[2]); var ap = (m[3]||'').toUpperCase();
+  if(ap==='PM' && h!==12) h+=12;
+  if(ap==='AM' && h===12) h=0;
+  return h*60+min;
+}
 function renderAssignmentTable() {
   // Group assignments by staff name
   const grouped = {};
   assignments.forEach(a => {
     if (!grouped[a.staff]) grouped[a.staff] = [];
     grouped[a.staff].push(a);
+  });
+  // Sort each staff member's assignments by start time
+  Object.keys(grouped).forEach(name => {
+    grouped[name].sort((a,b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time));
   });
 
   let html = '';
