@@ -496,7 +496,7 @@
   </div>
   <div class="nav-section-label">Team</div>
   <div class="nav-item" onclick="showPage('staff')" id="nav-staff">
-    <span class="icon">👥</span><span>RBT Profiles</span>
+    <span class="icon">👥</span><span>Staff Profiles</span>
   </div>
   <div class="nav-item" onclick="showPage('schedules')" id="nav-schedules">
     <span class="icon">📅</span><span>Staff Schedules</span>
@@ -594,7 +594,7 @@
   <section class="page-section" id="page-staff">
     <div class="topbar">
       <div class="topbar-title">
-        <h2>👥 RBT Profiles</h2>
+        <h2>👥 Staff Profiles</h2>
         <p>Get to know your teammates</p>
       </div>
     </div>
@@ -1076,6 +1076,11 @@ function renderTimeline() {
 
 // ===================== RENDER: RBT PROFILES =====================
 function renderStaff() {
+  // Always re-read from storage so staff added in admin show up immediately
+  var latestStaff = loadData('cc_staff', null);
+  if (latestStaff && Array.isArray(latestStaff) && latestStaff.length > 0) {
+    staffList = latestStaff;
+  }
   const grid = document.getElementById('rbt-grid');
   grid.innerHTML = '';
   staffList.forEach((s, i) => {
@@ -1891,7 +1896,7 @@ function showStaffApp(name) {
   if (note) note.textContent = 'Your responses will be saved under this name.';
   // Re-render if coverage tab is open
   renderCoverageRequests();
-  // Store for RBT profile editing
+  // Store for Staff Profile editing
   window._loggedInStaff = name;
 }
 
@@ -1904,6 +1909,11 @@ function saveCoverageWho() {
 }
 
 function tryStaffAutoLogin() {
+  // Re-read staff list so anyone added in admin appears in login dropdown
+  var latestStaff = loadData('cc_staff', null);
+  if (latestStaff && Array.isArray(latestStaff) && latestStaff.length > 0) {
+    staffList = latestStaff;
+  }
   // Populate name dropdown from staffList
   var sel = document.getElementById('sl-name');
   var accounts = getStaffAccounts();
