@@ -899,6 +899,14 @@ async function fetchStaffFromSupabase() {
       });
       saveData('cc_staff', staffList);
       renderStaff();
+      // Refresh login dropdown with updated names
+      var sel = document.getElementById('sl-name');
+      if (sel) {
+        var accounts = loadData('cc_staff_accounts', {});
+        var names = staffList.map(function(s){ return s.name; }).sort();
+        sel.innerHTML = '<option value="">— Select your name —</option>'
+          + names.map(function(n){ return '<option value="' + n + '">' + n + (accounts[n] ? '' : ' (no PIN)') + '</option>'; }).join('');
+      }
     }
   } catch(e) {
     // Fall back to stored data — renderStaff already called in init
@@ -1982,6 +1990,7 @@ function init() {
   renderReminders();
   renderCalendar();
   renderCoverageRequests();
+  tryStaffAutoLogin();
 }
 init();
 </script>
