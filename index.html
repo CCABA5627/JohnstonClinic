@@ -1469,7 +1469,7 @@ function showToast(msg, isErr) {
 const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri'];
 
 // Fixed time slots from 8 AM to 6 PM in 1-hour rows
-const TIME_SLOTS = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM','6:00 PM'];
+const TIME_SLOTS = ['8:00 AM','8:30 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM','6:00 PM'];
 
 // Parse a time string like "8:00 AM", "08:00", "8:00" into fractional hour (8.0, 13.5, etc.)
 function parseHour(t) {
@@ -1489,11 +1489,16 @@ function parseHour(t) {
 function slotIndex(startTime) {
   var h = parseHour(startTime);
   if(h === null) return -1;
-  // Snap to nearest hour slot >= 8
-  var idx = Math.round(h - 8);
-  if(idx < 0) idx = 0;
-  if(idx >= TIME_SLOTS.length) idx = TIME_SLOTS.length - 1;
-  return idx;
+  // Find the slot whose start time is closest to (but not after) the given time
+  var best = 0;
+  var bestDiff = Infinity;
+  TIME_SLOTS.forEach(function(slot, i) {
+    var sh = parseHour(slot);
+    if(sh === null) return;
+    var diff = h - sh;
+    if(diff >= 0 && diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
 }
 
 // Consistent color per client name so same client = same color across days
