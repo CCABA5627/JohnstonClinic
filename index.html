@@ -920,11 +920,13 @@ async function fetchStaffFromSupabase() {
     });
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
-      // Merge live names with any stored profile facts (hometown, fun facts etc from admin panel)
+      // Merge Supabase names with admin-added staff — admin entries NOT in Supabase are kept
       const stored = loadData('cc_staff', []);
       const storedMap = {};
       stored.forEach(s => { storedMap[s.name] = s; });
-      staffList = data.map(r => {
+      const supabaseNames = new Set(data.map(r => r.name));
+      // Build merged list: Supabase staff first (with any stored facts), then admin-only staff
+      const merged = data.map(r => {
         const existing = storedMap[r.name];
         return {
           name: r.name,
@@ -932,6 +934,11 @@ async function fetchStaffFromSupabase() {
           facts: existing?.facts || { hometown:'—', college:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
         };
       });
+      // Add any staff added via admin that aren't in Supabase
+      stored.forEach(s => {
+        if (!supabaseNames.has(s.name)) merged.push(s);
+      });
+      staffList = merged;
       saveData('cc_staff', staffList);
       renderStaff();
       // Refresh login dropdown with updated names
