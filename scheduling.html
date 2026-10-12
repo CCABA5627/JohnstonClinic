@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCABA Scheduling</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a18;font-size:14px;}
+.app{display:flex;flex-direction:column;min-height:100vh;}
+.nav{background:#fff;border-bottom:0.5px solid rgba(0,0,0,.15);padding:0 1.25rem;display:flex;align-items:center;height:48px;overflow-x:auto;}
+.nav-brand{font-size:14px;font-weight:500;margin-right:1.5rem;white-space:nowrap;}
+.nav-tab{padding:0 .75rem;height:48px;display:flex;align-items:center;font-size:12px;color:#666;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
+.nav-tab:hover{color:#111;}
+.nav-tab.active{color:#111;border-bottom-color:#534AB7;font-weight:500;}
+.nav-right{margin-left:auto;padding-left:1rem;flex-shrink:0;display:flex;align-items:center;gap:8px;}
+.si{font-size:11px;color:#888;white-space:nowrap;}
+.si.saved{color:#1D9E75;}.si.unsaved{color:#EF9F27;}
+.push-btn{padding:5px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:none;background:#1D9E75;color:#fff;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.push-btn:hover{background:#085041;}
+.push-btn:disabled{background:#aaa;cursor:not-allowed;}
+.push-status{font-size:11px;white-space:nowrap;}
+.main{display:flex;flex:1;overflow:hidden;height:calc(100vh - 48px);}
+.sidebar{width:230px;background:#fff;border-right:0.5px solid rgba(0,0,0,.15);overflow-y:auto;flex-shrink:0;}
+.content{flex:1;overflow-y:auto;padding:1.25rem;}
+.ss{padding:.875rem;border-bottom:0.5px solid rgba(0,0,0,.12);}
+.sl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:.5rem;}
+.si2{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:6px;cursor:pointer;margin-bottom:2px;}
+.si2:hover{background:#f0f0ee;}
+.si2.sel{background:#EEEDFE;color:#3C3489;}
+.si2 .nm{font-size:12px;flex:1;}
+.si2 .bx{font-size:10px;padding:1px 5px;border-radius:10px;background:#eee;color:#666;}
+.si2.sel .bx{background:#AFA9EC;color:#26215C;}
+.av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0;}
+.av-c{background:#E1F5EE;color:#085041;}.av-s{background:#E6F1FB;color:#0C447C;}
+.add-btn{width:100%;padding:5px 7px;border:0.5px dashed rgba(0,0,0,.2);border-radius:6px;background:none;color:#888;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;margin-top:5px;font-family:inherit;}
+.add-btn:hover{background:#f5f5f3;}
+.card{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:12px;padding:1.125rem;margin-bottom:.875rem;}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;}
+.ct{font-size:14px;font-weight:500;}
+.wdc{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:8px;overflow:hidden;}
+.wdh{padding:8px 10px;font-size:12px;font-weight:500;background:#f5f5f3;border-bottom:0.5px solid rgba(0,0,0,.12);display:flex;align-items:center;}
+.wsl{padding:6px 8px;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.wsb{border-radius:6px;padding:6px 9px;margin-bottom:4px;cursor:pointer;transition:filter .1s;display:flex;align-items:flex-start;gap:6px;}
+.wsb:hover{filter:brightness(.93);}
+.wsb-info{flex:1;min-width:0;}
+.wsb.wa{background:#E1F5EE;color:#085041;}
+.wsb.wu{background:#FAECE7;color:#4A1B0C;border:1px dashed #F0997B;}
+.wsb.wco{background:#F5C4B3;color:#4A1B0C;border:1px solid #F0997B;}
+.wsb.wconflict{background:#FAECE7;color:#D85A30;border:1px solid #D85A30;}
+.wsb.wtmp{background:#E6F1FB;color:#0C447C;border:1px dashed #85B7EB;}
+.wsb.wpartial{background:#FFF8EC;color:#7a5000;border:1px solid #EF9F27;}
+.wsb-gap{font-size:9px;color:#b87a00;font-weight:600;margin-top:2px;}
+.wsb-time{font-size:10px;opacity:.75;margin-bottom:1px;}
+.wsb-client{font-size:11px;font-weight:500;}
+.wsb-staff{font-size:10px;margin-top:2px;}
+.wsb-del{background:none;border:none;cursor:pointer;font-size:14px;opacity:.4;padding:0 2px;color:inherit;flex-shrink:0;line-height:1;margin-top:1px;}
+.wsb-del:hover{opacity:1;}
+.ts{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;}
+.ts:hover{background:#fafaf9;}
+.ts.tmp{border-color:#85B7EB;background:#E6F1FB;}
+.sc2{font-size:11px;padding:2px 8px;border-radius:20px;background:#E6F1FB;color:#185FA5;}
+.uc{font-size:11px;padding:2px 8px;border-radius:20px;background:#FAECE7;color:#993C1D;}
+.cc{font-size:11px;padding:2px 8px;border-radius:20px;background:#F5C4B3;color:#4A1B0C;}
+.tc{font-size:11px;padding:2px 8px;border-radius:20px;background:#E6F1FB;color:#0C447C;}
+.pm{background:#f5f5f3;border:0.5px solid rgba(0,0,0,.12);border-radius:7px;padding:7px 9px;display:flex;align-items:center;gap:7px;cursor:pointer;}
+.pm.ip{background:#E6F1FB;border-color:#85B7EB;}
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:.625rem;}
+.co2{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:7px;padding:8px 10px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;}
+.mg{background:#C0DD97;color:#173404;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;}
+.mo{background:#FAC775;color:#412402;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;}
+.mp{background:#F5C4B3;color:#4A1B0C;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;}
+.cob{background:#FAECE7;border:0.5px solid #F0997B;border-radius:10px;padding:1rem;margin-bottom:.875rem;}
+.cot{font-size:13px;font-weight:500;color:#4A1B0C;margin-bottom:.5rem;}
+input[type=text],select{padding:6px 9px;border:0.5px solid rgba(0,0,0,.2);border-radius:6px;font-size:12px;background:#fff;color:#111;font-family:inherit;width:100%;}
+input:focus,select:focus{outline:none;border-color:#7F77DD;}
+.btn{padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;border:0.5px solid rgba(0,0,0,.2);background:#fff;color:#111;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+.btn:hover{background:#eee;}
+.btn-p{background:#534AB7;color:#fff;border-color:#534AB7;}.btn-p:hover{background:#3C3489;}
+.btn-d{background:#D85A30;color:#fff;border-color:#D85A30;}.btn-d:hover{background:#993C1D;}
+.btn-g{background:#1D9E75;color:#fff;border-color:#1D9E75;}.btn-g:hover{background:#085041;}
+.btn-b{background:#185FA5;color:#fff;border-color:#185FA5;}.btn-b:hover{background:#0C447C;}
+.btn-sm{padding:3px 8px;font-size:11px;}
+.es{text-align:center;padding:2.5rem 1rem;color:#888;}
+.lg{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem;}
+.li{display:flex;align-items:center;gap:4px;font-size:10px;color:#777;}
+.ld{width:10px;height:10px;border-radius:2px;}
+.dr{width:7px;height:7px;border-radius:50%;display:inline-block;background:#E24B4A;}
+.ie{border:none;background:transparent;font-size:13px;font-weight:500;font-family:inherit;color:#111;flex:1;max-width:200px;padding:2px 4px;border-radius:4px;}
+.ie:focus{outline:none;background:#EEEDFE;}
+.sx{overflow-x:auto;}
+.sp{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:12px;padding:1.25rem;margin-bottom:1rem;}
+.sp h3{font-size:14px;font-weight:500;margin-bottom:.75rem;}
+.ai-wrap{display:flex;flex-direction:column;height:calc(100vh - 48px);max-width:820px;margin:0 auto;padding:1.25rem;gap:.75rem;}
+.ai-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.75rem;padding-bottom:.5rem;}
+.ai-msg{border-radius:12px;padding:.875rem 1rem;font-size:13px;line-height:1.6;max-width:90%;}
+.ai-msg.user{background:#534AB7;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.ai-msg.assistant{background:#fff;border:0.5px solid rgba(0,0,0,.12);align-self:flex-start;border-bottom-left-radius:4px;white-space:pre-wrap;}
+.ai-msg.system{background:#f5f5f3;color:#888;font-size:11px;align-self:center;border-radius:8px;}
+.ai-msg.error{background:#FAECE7;color:#D85A30;border:0.5px solid #F0997B;align-self:flex-start;}
+.ai-input-row{display:flex;gap:8px;align-items:flex-end;}
+.ai-input-row textarea{flex:1;padding:10px 12px;border:0.5px solid rgba(0,0,0,.2);border-radius:10px;font-size:13px;font-family:inherit;resize:none;line-height:1.5;min-height:44px;max-height:120px;overflow-y:auto;}
+.ai-input-row textarea:focus{outline:none;border-color:#7F77DD;}
+.ai-send{padding:10px 18px;border-radius:10px;background:#534AB7;color:#fff;border:none;font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0;align-self:flex-end;}
+.ai-send:hover{background:#3C3489;}
+.ai-send:disabled{background:#aaa;cursor:not-allowed;}
+.ai-key-wrap{background:#EEEDFE;border:1px solid #AFA9EC;border-radius:10px;padding:1rem;margin-bottom:.75rem;}
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.5rem;}
+.ai-sug{padding:5px 12px;border-radius:16px;border:1px solid #AFA9EC;background:#fff;color:#534AB7;font-size:12px;cursor:pointer;font-family:inherit;}
+.ai-sug:hover{background:#EEEDFE;}
+.ai-typing{display:flex;gap:4px;align-items:center;padding:.5rem .75rem;}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:#aaa;animation:blink 1.2s infinite;}
+.ai-typing span:nth-child(2){animation-delay:.2s;}
+.ai-typing span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.toast{position:fixed;bottom:20px;right:20px;background:#1D9E75;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:9999;display:none;pointer-events:none;}
+.toast.err{background:#D85A30;}
+.exs{background:#f5f5f3;border-radius:10px;padding:1rem;margin-top:.625rem;}
+.exs h4{font-size:11px;font-weight:500;color:#777;margin-bottom:.625rem;text-transform:uppercase;letter-spacing:.04em;}
+.dr2{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.5rem;}
+.dp{min-width:56px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:2px solid rgba(0,0,0,.18);background:#fff;color:#888;font-family:inherit;text-align:center;transition:all .12s;user-select:none;}
+.dp:hover:not(.on){border-color:#7F77DD;color:#534AB7;background:#EEEDFE;}
+.dp.on{background:#534AB7;color:#fff;border-color:#534AB7;}
+.it{font-size:11px;color:#888;margin-top:6px;font-style:italic;}
+.blk-builder{margin-top:.75rem;}
+.blk-builder h4{font-size:11px;font-weight:500;color:#777;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem;}
+.blk-day-row{margin-bottom:1rem;background:#f5f5f3;border-radius:10px;padding:.75rem;}
+.blk-day-label{font-size:12px;font-weight:500;color:#534AB7;margin-bottom:.5rem;}
+.blk-list{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;}
+.blk-item{background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;}
+.blk-item.has-staff{border-color:#5DCAA5;background:#E1F5EE;}
+.blk-item.no-staff{border-color:#F0997B;background:#FAECE7;}
+.blk-time{font-size:12px;font-weight:500;min-width:140px;color:#333;}
+.blk-staff-sel{flex:1;font-size:12px;}
+.blk-del{background:none;border:none;cursor:pointer;color:#D85A30;font-size:16px;padding:0 4px;line-height:1;}
+.blk-del:hover{color:#993C1D;}
+.add-blk-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;}
+.add-blk-row select{flex:1;min-width:90px;font-size:11px;padding:4px 6px;}
+.add-blk-row .btn{font-size:11px;padding:4px 10px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding-top:80px;}
+.modal-overlay.hidden{display:none;}
+.modal-box{background:#fff;border-radius:12px;padding:1.25rem;width:320px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+.modal-title{font-size:14px;font-weight:500;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;}
+.modal-close{cursor:pointer;font-size:18px;color:#888;line-height:1;background:none;border:none;font-family:inherit;}
+.modal-close:hover{color:#111;}
+.staff-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:3px;border:1.5px solid transparent;}
+.staff-opt:hover{background:#f5f5f3;}
+.staff-opt.current{background:#E1F5EE;border-color:#5DCAA5;}
+.staff-opt.unavail{opacity:.4;cursor:not-allowed;}
+.staff-opt-name{font-size:13px;font-weight:500;flex:1;}
+.staff-opt-sub{font-size:11px;color:#888;}
+.modal-section{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:#999;margin:10px 0 5px;}
+.unassign-btn{width:100%;padding:7px;border-radius:7px;border:0.5px solid rgba(0,0,0,.15);background:none;color:#D85A30;font-size:12px;cursor:pointer;font-family:inherit;margin-top:6px;}
+.unassign-btn:hover{background:#FAECE7;}
+.tb-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+.tb-row label{font-size:12px;color:#555;min-width:60px;}
+.tb-row select,.tb-row input[type=text]{flex:1;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav">
+    <span class="nav-brand">CCABA Scheduling</span>
+    <div class="nav-tab active" data-tab="today" onclick="go('today')">Today</div>
+    <div class="nav-tab" data-tab="week" onclick="go('week')">Weekly</div>
+    <div class="nav-tab" data-tab="clients" onclick="go('clients')">Clients</div>
+    <div class="nav-tab" data-tab="staff" onclick="go('staff')">Staff</div>
+    <div class="nav-tab" data-tab="pods" onclick="go('pods')">Pods</div>
+    <div class="nav-tab" data-tab="callout" onclick="go('callout')">Callout</div>
+    <div class="nav-tab" data-tab="data" onclick="go('data')">Edit Data</div>
+    <div class="nav-tab" data-tab="save" onclick="go('save')">Save/Load</div>
+    <div class="nav-tab" data-tab="ai" onclick="go('ai')">&#x1F916; AI Assistant</div>
+    <div class="nav-right">
+      <span class="push-status" id="push-status"></span>
+      <button class="push-btn" id="push-btn" onclick="pushToPortal()">&#x1F4E4; Push to Staff Portal</button>
+      <span class="si" id="si">Not saved</span>
+      <button class="btn btn-g btn-sm" onclick="doSave()" style="font-size:11px;padding:4px 12px">Save now</button>
+    </div>
+  </div>
+  <div class="main" id="mc"></div>
+</div>
+
+<div class="modal-overlay hidden" id="assign-modal" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      <span id="modal-title-text">Assign staff</span>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="temp-modal" onclick="closeTempModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      <span>&#x2B; Add temporary block</span>
+      <button class="modal-close" onclick="closeTempModal()">&#x2715;</button>
+    </div>
+    <div id="temp-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+// ===================== SUPABASE =====================
+const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
+
+async function pushToPortal() {
+  const btn = document.getElementById('push-btn');
+  const status = document.getElementById('push-status');
+  btn.disabled = true;
+  btn.textContent = 'Pushing...';
+  status.textContent = '';
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const todayDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+    const rows = [];
+
+    S.clients.forEach(c => {
+      if(S.calledOutClients.includes(c.id)) return;
+      (c.schedule[todayDay] || []).forEach(blk => {
+        if(blk.splits && blk.splits.length) {
+          blk.splits.forEach(sp => {
+            if(isStaffOut(sp.sid)) return;
+            const staffMember = gsN(sp.sid);
+            if(!staffMember) return;
+            rows.push({ staff: staffMember.name, client: c.name, time: sp.from + ' \u2013 ' + sp.to, location: 'Center', date: today });
+          });
+        } else {
+          if(!blk.staffId) return;
+          const staffMember = gsN(blk.staffId);
+          if(!staffMember || isStaffOut(blk.staffId)) return;
+          rows.push({ staff: staffMember.name, client: c.name, time: blk.from + ' \u2013 ' + blk.to, location: 'Center', date: today });
+        }
+      });
+    });
+
+    // Temp blocks — include even for cancelled clients (they're replacement sessions)
+    (S.tempBlocks || []).filter(tb => tb.day === todayDay && tb.staffId).forEach(tb => {
+      if(isStaffOut(tb.staffId)) return;
+      const staffMember = gsN(tb.staffId);
+      const client = gcN(tb.cid);
+      if(!staffMember || !client) return;
+      rows.push({ staff: staffMember.name, client: client.name, time: tb.from + ' \u2013 ' + tb.to, location: 'Center', date: today });
+    });
+
+    await fetch(`${SUPABASE_URL}/rest/v1/assignments?date=eq.${today}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+    });
+    if (rows.length > 0) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/assignments`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(rows)
+      });
+      if (!res.ok) throw new Error('Insert failed: ' + res.status);
+    }
+
+    // Also push staff schedules
+    await pushStaffSchedules();
+
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    status.textContent = '\u2713 Pushed ' + rows.length + ' assignments at ' + time;
+    status.style.color = '#1D9E75';
+    showToast('\u2713 ' + rows.length + ' assignments pushed to Staff Portal!', false);
+  } catch(e) {
+    status.textContent = '\u26a0 Push failed \u2014 check connection';
+    status.style.color = '#D85A30';
+    showToast('Push failed: ' + e.message, true);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '&#x1F4E4; Push to Staff Portal';
+}
+
+async function pushStaffSchedules() {
+  const sessionRows = [];
+  const availRows = [];
+
+  S.staff.forEach(s => {
+    DAYS.forEach(d => {
+      // Push each individual assigned session block — use getEffectiveBlocks so
+      // any today-set staff overrides (even for future days) are included
+      S.clients.forEach(c => {
+        getEffectiveBlocks(c.id, d).forEach(blk => {
+          if(blk.splits && blk.splits.length) {
+            blk.splits.forEach(sp => {
+              if(sp.sid === s.id)
+                sessionRows.push({ staff_name: s.name, day: d, start_time: sp.from, end_time: sp.to, client_name: c.name });
+            });
+          } else if(blk.staffId === s.id) {
+            sessionRows.push({ staff_name: s.name, day: d, start_time: blk.from, end_time: blk.to, client_name: c.name });
+          }
+        });
+      });
+
+      // Push availability window for this day
+      const avSlots = s.availability[d] || [];
+      if(avSlots.length) {
+        const avStart = avSlots[0];
+        const lastIdx = avSlots.length - 1;
+        const lastSlot = avSlots[lastIdx];
+        const lastSlotIdx = TIMES.indexOf(lastSlot);
+        const avEnd = TIMES[lastSlotIdx + 1] || lastSlot;
+        availRows.push({ staff_name: s.name, day: d, start_time: avStart, end_time: avEnd });
+      }
+    });
+  });
+
+  // Replace staff_schedules (sessions)
+  await fetch(`${SUPABASE_URL}/rest/v1/staff_schedules?staff_name=neq.null`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+  });
+  if(sessionRows.length > 0) {
+    await fetch(`${SUPABASE_URL}/rest/v1/staff_schedules`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(sessionRows)
+    });
+  }
+
+  // Replace staff_availability
+  await fetch(`${SUPABASE_URL}/rest/v1/staff_availability?staff_name=neq.null`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+  });
+  if(availRows.length > 0) {
+    await fetch(`${SUPABASE_URL}/rest/v1/staff_availability`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(availRows)
+    });
+  }
+
+  // Push staff names
+  const staffNames = S.staff.map(s => ({ name: s.name }));
+  await fetch(`${SUPABASE_URL}/rest/v1/staff_names?name=neq.null`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
+  });
+  if(staffNames.length > 0) {
+    await fetch(`${SUPABASE_URL}/rest/v1/staff_names`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(staffNames)
+    });
+  }
+}
+
+// ===================== SCHEDULER =====================
+const DAYS=['Mon','Tue','Wed','Thu','Fri'];
+const ALL_DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function bT(){const o=[];for(let h=8;h<=17;h++){for(let m=0;m<60;m+=15){if(h===17&&m>0)break;const ap=h<12?'AM':'PM';const h12=h===0?12:h>12?h-12:h;o.push(`${h12}:${m===0?'00':m} ${ap}`);}}return o;}
+const TIMES=bT();
+function t2m(t){const[ti,ap]=t.split(' ');const[h,m]=ti.split(':').map(Number);let hr=h;if(ap==='PM'&&h!==12)hr=h+12;if(ap==='AM'&&h===12)hr=0;return hr*60+m;}
+// Given the last slot in an availability array, return the actual end time (next 15-min boundary)
+function availEnd(sl){const idx=TIMES.indexOf(sl[sl.length-1]);return TIMES[idx+1]||sl[sl.length-1];}
+const SK='podscheduler_v4';
+
+const DD={
+  clients:[
+    {id:'c1',name:'Margaret T.',schedule:{Mon:[{from:'9:00 AM',to:'12:45 PM',staffId:'s1'},{from:'1:00 PM',to:'4:45 PM',staffId:'s2'}],Wed:[{from:'9:00 AM',to:'10:00 AM',staffId:'s3'}],Fri:[{from:'9:00 AM',to:'11:00 AM',staffId:'s1'}]}},
+    {id:'c2',name:'David R.',schedule:{Tue:[{from:'10:00 AM',to:'12:00 PM',staffId:'s2'}],Thu:[{from:'10:00 AM',to:'11:00 AM',staffId:'s4'}]}},
+    {id:'c3',name:'Linda K.',schedule:{Mon:[{from:'1:00 PM',to:'2:00 PM',staffId:'s3'}],Wed:[{from:'1:00 PM',to:'3:00 PM',staffId:'s2'}]}},
+    {id:'c4',name:'James B.',schedule:{Mon:[{from:'9:00 AM',to:'9:30 AM',staffId:'s1'}],Tue:[{from:'9:00 AM',to:'10:00 AM',staffId:'s4'}],Thu:[{from:'9:00 AM',to:'10:00 AM',staffId:'s4'}]}},
+    {id:'c5',name:'Sandra W.',schedule:{Wed:[{from:'10:00 AM',to:'11:00 AM',staffId:'s5'}],Fri:[{from:'10:00 AM',to:'12:00 PM',staffId:'s5'}]}},
+  ],
+  staff:[
+    {id:'s1',name:'Alex M.',availability:{Mon:['8:00 AM','8:15 AM','8:30 AM','8:45 AM','9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM','11:15 AM','11:30 AM','11:45 AM','12:00 PM','12:15 PM','12:30 PM','12:45 PM'],Tue:['9:00 AM','9:15 AM','9:30 AM','10:00 AM'],Wed:['9:00 AM','9:15 AM','9:30 AM','9:45 AM'],Fri:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM']}},
+    {id:'s2',name:'Jordan P.',availability:{Mon:['1:00 PM','1:15 PM','1:30 PM','1:45 PM','2:00 PM','2:15 PM','2:30 PM','2:45 PM','3:00 PM','3:15 PM','3:30 PM','3:45 PM','4:00 PM','4:15 PM','4:30 PM','4:45 PM'],Tue:['10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM','11:15 AM','11:30 AM','11:45 AM','12:00 PM'],Wed:['1:00 PM','1:15 PM','1:30 PM','1:45 PM','2:00 PM','2:15 PM','2:30 PM','2:45 PM','3:00 PM'],Thu:['10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM']}},
+    {id:'s3',name:'Taylor B.',availability:{Mon:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','1:00 PM','1:15 PM','1:30 PM','1:45 PM','2:00 PM'],Wed:['10:00 AM','10:15 AM','1:00 PM','1:15 PM','1:30 PM','1:45 PM','2:00 PM','2:15 PM','2:30 PM','2:45 PM','3:00 PM'],Fri:['2:00 PM','2:15 PM','2:30 PM','2:45 PM','3:00 PM']}},
+    {id:'s4',name:'Morgan L.',availability:{Tue:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM'],Thu:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM'],Fri:['10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM','11:15 AM','11:30 AM','11:45 AM','12:00 PM']}},
+    {id:'s5',name:'Riley C.',availability:{Mon:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM'],Wed:['10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM'],Thu:['10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM'],Fri:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM']}},
+    {id:'s6',name:'Casey N.',availability:{Mon:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM','11:00 AM'],Tue:['9:00 AM','9:15 AM'],Wed:['9:00 AM','9:15 AM','9:30 AM','9:45 AM','10:00 AM']}},
+  ],
+  pods:{c1:['s1','s2','s3','s5','s6'],c2:['s2','s4','s6'],c3:['s2','s3'],c4:['s1','s4','s6'],c5:['s1','s3','s5']},
+  tempBlocks:[]
+};
+
+function slotsInBlock(from,to){const lo=t2m(from),hi=t2m(to);if(lo===hi)return TIMES.filter(t=>t2m(t)===lo);return TIMES.filter(t=>t2m(t)>=lo&&t2m(t)<hi);}
+function initSDS(st){const sd={};st.forEach(s=>{sd[s.id]=new Set(Object.keys(s.availability).filter(d=>DAYS.includes(d)));});return sd;}
+
+let S={tab:'today',...JSON.parse(JSON.stringify(DD)),selClient:'c1',selStaff:'s1',calloutStaff:null,calloutClient:null,calledOut:[],calledOutClients:[],clientOverrides:{},clientOverrideCounts:{},staffOverrides:{},acknowledgedChanges:{},todayFilter:'all',calloutMode:'staff',edTab:'clients',expEdit:null,dirty:false,lastSaved:null,podView:'clients',selPodClient:null,selPodStaff:null,aiKey:'',aiMessages:[],aiLoading:false,selectedDay:null};
+S.selDaysS=initSDS(S.staff);
+
+// clientOverrides: {cid: [{blockIdx, day, from, to, date}]} — today-only per-block TIME overrides
+// staffOverrides:  {cid: [{blockIdx, day, staffId, date}]}   — today-only per-block STAFF overrides (substitutions)
+// Neither ever touches c.schedule — the clients tab is the permanent source of truth.
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function getEffectiveBlocks(cid, day){
+  const c=gcN(cid); if(!c) return [];
+  const blocks=c.schedule[day]||[];
+  const iso=todayISO();
+  // Time overrides (today-only schedule adjustments)
+  const rawOvList=S.clientOverrides[cid];
+  const ovList=Array.isArray(rawOvList)?rawOvList:[];
+  const activeOvs=ovList.filter(o=>o.date?o.date===iso&&o.day===day:o.day===day);
+  // Staff overrides (today-only substitutions assigned through callout coverage)
+  const rawStOvList=S.staffOverrides[cid];
+  const stOvList=Array.isArray(rawStOvList)?rawStOvList:[];
+  const activeStOvs=stOvList.filter(o=>o.date===iso&&o.day===day);
+  const todayCount=(S.clientOverrideCounts?.[cid])||blocks.length;
+  const count=Math.max(blocks.length,activeOvs.length>0?todayCount:blocks.length);
+  return Array.from({length:count},(_,idx)=>{
+    const blk=blocks[idx]||{from:'',to:'',staffId:null,splits:null};
+    const ov=activeOvs.find(o=>o.blockIdx===idx);
+    const stOv=activeStOvs.find(o=>o.blockIdx===idx);
+    let result={...blk};
+    if(ov) result={...result,from:ov.from,to:ov.to,_overridden:true,_origFrom:blk.from,_origTo:blk.to};
+    if(stOv) result={...result,staffId:stOv.staffId,splits:null,_staffOverridden:true,_origStaffId:blk.staffId};
+    return result;
+  }).filter(blk=>blk.from&&blk.to);
+}
+function setClientOverride(cid,day,blockIdx,from,to){
+  if(!S.clientOverrides[cid]) S.clientOverrides[cid]=[];
+  const iso=todayISO();
+  // Remove existing override for this block/date
+  S.clientOverrides[cid]=S.clientOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&(o.date===iso||!o.date)));
+  S.clientOverrides[cid].push({day,blockIdx,from,to,date:iso});
+  markDirty();render();
+  showToast(`${gcN(cid)?.name} block adjusted to ${from} – ${to} for today only`,false);
+}
+function undoChangeItem(i){
+  var ci=(window._changeItemsData||[])[i];
+  if(!ci||!ci.undo)return;
+  var u=ci.undo;
+  if(u.type==='staff-callout'){rmCO(u.sid);markDirty();render();showToast('Removed callout — '+u.label.replace('Restore ',''),false);}
+  else if(u.type==='client-cancel'){rmClientCO(u.cid);showToast(u.label,false);}
+  else if(u.type==='time-override'){
+    if(S.clientOverrides[u.cid]){
+      var iso2=todayISO();
+      S.clientOverrides[u.cid]=S.clientOverrides[u.cid].filter(function(o){return!(o.blockIdx===u.blockIdx&&(o.date===iso2||!o.date));});
+      if(!S.clientOverrides[u.cid].length)delete S.clientOverrides[u.cid];
+    }
+    markDirty();render();showToast('Time override removed',false);
+  }
+  else if(u.type==='staff-assign'){doAssign(u.cid,u.day,u.blockIdx,null,'');}
+  else if(u.type==='temp-block'){deleteTempBlock(u.tempId);}
+}
+function togAck(key){
+  const iso=todayISO();
+  if(!S.acknowledgedChanges[iso])S.acknowledgedChanges[iso]={};
+  if(S.acknowledgedChanges[iso][key])delete S.acknowledgedChanges[iso][key];
+  else S.acknowledgedChanges[iso][key]=true;
+  markDirty();render();
+}
+function isAcked(key){const iso=todayISO();return !!(S.acknowledgedChanges[iso]&&S.acknowledgedChanges[iso][key]);}
+function togAckIdx(i){var key=(window._ackKeyMap||{})[i];if(key)togAck(key);}
+function clearClientOverride(cid,day,blockIdx){
+  if(!S.clientOverrides[cid])return;
+  if(day!==undefined&&blockIdx!==undefined){
+    const iso=todayISO();
+    S.clientOverrides[cid]=S.clientOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&(o.date===iso||!o.date)));
+    if(!S.clientOverrides[cid].length) delete S.clientOverrides[cid];
+  } else {
+    delete S.clientOverrides[cid];
+  }
+  markDirty();render();
+  showToast('Override cleared — back to regular schedule',false);
+}
+
+// calledOut entries: {sid, fromM?, toM?}  — fromM/toM in minutes; if absent = all day
+function isStaffOut(sid){return S.calledOut.some(co=>co.sid===sid&&co.fromM===undefined);}
+function isStaffOutAt(sid,slotTime){
+  const m=t2m(slotTime);
+  return S.calledOut.some(co=>{
+    if(co.sid!==sid)return false;
+    if(co.fromM===undefined)return true; // all day
+    return m>=co.fromM&&m<co.toM;
+  });
+}
+function getStaffCallout(sid){return S.calledOut.filter(co=>co.sid===sid);}
+function coLabel(co){
+  if(co.fromM===undefined)return'all day';
+  function mToT(m){const hr=Math.floor(m/60);const mn=m%60;const ap=hr<12?'AM':'PM';const h12=hr===0?12:hr>12?hr-12:hr;return`${h12}:${mn===0?'00':mn} ${ap}`;}
+  return`${mToT(co.fromM)} \u2013 ${mToT(co.toM)}`;
+}
+
+window._BM={};
+function regBlock(key,data){window._BM[key]=data;return key;}
+function openBlock(key){const d=window._BM[key];if(d)openAssignModal(d.cid,d.day,d.blockIdx,d.isTemp,d.tempId);}
+
+function openAssignModal(cid,day,blockIdx,isTemp,tempId){
+  const c=gcN(cid);let blockFrom,blockTo,currentSid,slots,blk;
+  if(isTemp){blk=S.tempBlocks.find(t=>t.id===tempId);if(!blk)return;blockFrom=blk.slots[0];blockTo=blk.slots[blk.slots.length-1];currentSid=blk.staffId;slots=blk.slots;}
+  else{blk=(c?.schedule[day]||[])[blockIdx];if(!blk)return;blockFrom=blk.from;blockTo=blk.to;const effBlk=getEffectiveBlocks(cid,day)[blockIdx];currentSid=effBlk?effBlk.staffId:blk.staffId;slots=slotsInBlock(blk.from,blk.to);}
+  const range=blockFrom+(blockFrom!==blockTo?' \u2013 '+blockTo:'');
+  document.getElementById('modal-title-text').textContent=(c?.name||'?')+' \u00b7 '+day+' '+range;
+  const pod=S.pods[cid]||[];
+  const podSet=new Set(pod);
+  const usedOther=new Set();
+  (c?.schedule[day]||[]).forEach((blk2,i2)=>{if(!isTemp&&i2===blockIdx)return;if(blk2.staffId)usedOther.add(blk2.staffId);});
+  S.tempBlocks.forEach(tb=>{if(tb.cid!==cid||tb.day!==day||tb.id===tempId)return;if(tb.staffId)usedOther.add(tb.staffId);});
+
+  // Conflict check that respects cancelled clients
+  function chkConflict(sid,newSlots,excCid,excBlockIdx,excTempId){
+    const conflicts=[];const ns=new Set(newSlots);
+    S.clients.forEach(cl=>{
+      if(S.calledOutClients.includes(cl.id))return;
+      getEffectiveBlocks(cl.id,day).forEach((blk,idx)=>{
+        if(blk.staffId!==sid)return;
+        if(cl.id===excCid&&idx===excBlockIdx)return;
+        const ov=slotsInBlock(blk.from,blk.to).filter(s=>ns.has(s));
+        if(ov.length>0)conflicts.push({name:cl.name,from:blk.from,to:blk.to});
+      });
+    });
+    (S.tempBlocks||[]).forEach(tb=>{
+      if(tb.staffId!==sid||tb.day!==day)return;
+      if(tb.id===excTempId)return;
+      if(S.calledOutClients.includes(tb.cid))return;
+      const ov=tb.slots.filter(s=>ns.has(s));
+      if(ov.length>0)conflicts.push({name:gcN(tb.cid)?.name||'?',from:tb.from,to:tb.to});
+    });
+    return{hasConflict:conflicts.length>0,conflicts};
+  }
+
+  // If primary staff has a partial callout, auto-convert to splits so popup reflects reality
+  if(blk&&blk.staffId&&!blk.splits){
+    const staffCOs=getStaffCallout(blk.staffId);
+    const hasPartialCO=staffCOs.some(co=>co.fromM!==undefined);
+    if(hasPartialCO){
+      // Build splits: staff covers only the slots they are NOT called out for
+      const calledOutSlots=new Set();
+      staffCOs.forEach(co=>{
+        if(co.fromM===undefined)return; // all day handled elsewhere
+        slotsInBlock(blk.from,blk.to).forEach(sl=>{if(t2m(sl)>=co.fromM&&t2m(sl)<co.toM)calledOutSlots.add(sl);});
+      });
+      const covSlots=slotsInBlock(blk.from,blk.to).filter(sl=>!calledOutSlots.has(sl));
+      if(covSlots.length){
+        const ef=covSlots[0];
+        const elIdx=TIMES.indexOf(covSlots[covSlots.length-1]);
+        const et=TIMES[elIdx+1]||blk.to;
+        blk.splits=[{sid:blk.staffId,from:ef,to:et}];
+      } else {
+        blk.splits=[];
+      }
+    }
+  }
+
+  // Compute which slots are already covered by existing splits — excluding called-out slots
+  const alreadyCoveredSlots=new Set();
+  if(blk?.splits){
+    blk.splits.forEach(sp=>{
+      const spCOs=getStaffCallout(sp.sid);
+      const calledOutM=new Set();
+      spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
+      slotsInBlock(sp.from,sp.to).forEach(sl=>{
+        if(slots.includes(sl)&&!calledOutM.has(t2m(sl)))alreadyCoveredSlots.add(sl);
+      });
+    });
+  } else if(blk?.staffId){
+    const staffCOs=getStaffCallout(blk.staffId);
+    const calledOutM=new Set();
+    staffCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
+    if(!staffCOs.some(co=>co.fromM===undefined)){
+      const pav=new Set(gsN(blk.staffId)?.availability[day]||[]);
+      slots.forEach(sl=>{if(pav.has(sl)&&!calledOutM.has(t2m(sl)))alreadyCoveredSlots.add(sl);});
+    }
+  }
+  const remainingSlots=slots.filter(sl=>!alreadyCoveredSlots.has(sl));
+
+  // How many of the block's slots does this staff member's availability cover?
+  function getAvailSlots(sid){
+    const av=new Set(gsN(sid)?.availability[day]||[]);
+    return slots.filter(sl=>av.has(sl));
+  }
+  // What portion of the REMAINING uncovered slots can this staff fill?
+  function getContribSlots(sid){
+    const av=new Set(gsN(sid)?.availability[day]||[]);
+    const pool=remainingSlots.length?remainingSlots:slots;
+    return pool.filter(sl=>av.has(sl));
+  }
+  function slotEndDisplay(slotTime,cap){
+    const idx=TIMES.indexOf(slotTime);const next=TIMES[idx+1];
+    return(next&&t2m(next)<=t2m(cap))?next:cap;
+  }
+  // Describe the time range a staff member would cover (their contribution to the gap)
+  function descContrib(contribSlots){
+    if(!contribSlots.length)return null;
+    const from=contribSlots[0];
+    const displayEnd=slotEndDisplay(contribSlots[contribSlots.length-1],blockTo);
+    const mins=contribSlots.length*15;
+    const dur=mins>=60?Math.floor(mins/60)+'h'+(mins%60?' '+mins%60+'m':''):(mins+'m');
+    return`Would cover ${from} \u2013 ${displayEnd} (${dur})`;
+  }
+
+  function getStaffTodaySchedule(sid){
+    // Returns array of {clientName, from, to, overlapsBlock} for all of today's assignments
+    const result=[];
+    const blockSlotsSet=new Set(slots);
+    S.clients.forEach(cl=>{
+      if(S.calledOutClients.includes(cl.id))return;
+      getEffectiveBlocks(cl.id,day).forEach((eb,idx)=>{
+        if(!eb.staffId)return;
+        // Check splits too
+        const assignedStaff=[];
+        if(eb.splits&&eb.splits.length) eb.splits.forEach(sp=>{ if(sp.sid===sid) assignedStaff.push({from:sp.from,to:sp.to}); });
+        else if(eb.staffId===sid) assignedStaff.push({from:eb.from,to:eb.to});
+        assignedStaff.forEach(slot=>{
+          const slotSet=new Set(slotsInBlock(slot.from,slot.to));
+          const overlaps=[...slotSet].some(s=>blockSlotsSet.has(s));
+          result.push({clientName:cl.name,from:slot.from,to:slot.to,overlapsBlock:overlaps});
+        });
+      });
+    });
+    // Also temp blocks
+    (S.tempBlocks||[]).filter(tb=>tb.day===day&&tb.staffId===sid).forEach(tb=>{
+      const slotSet=new Set(tb.slots);
+      const overlaps=[...slotSet].some(s=>blockSlotsSet.has(s));
+      result.push({clientName:gcN(tb.cid)?.name||'Temp',from:tb.from,to:tb.to,overlapsBlock:overlaps});
+    });
+    return result;
+  }
+  function staffRow(sid,subText,isCur,hasConflict,note,extraStyle,mode){
+    const s=gsN(sid);
+    const assignFn=mode==='partial'
+      ?`doAssignPartial('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}')`
+      :`doAssign('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}')`;
+    // Build today's schedule display
+    const todaySched=getStaffTodaySchedule(sid);
+    let schedHtml='';
+    if(todaySched.length===0){
+      schedHtml='<div style="font-size:10px;color:#1D9E75;margin-top:2px;">Free all day</div>';
+    } else {
+      schedHtml='<div style="margin-top:3px;display:flex;flex-direction:column;gap:2px;">'+
+        todaySched.map(e=>{
+          const color=e.overlapsBlock?'#D85A30':'#185FA5';
+          const bg=e.overlapsBlock?'#FFF0EB':'#E6F1FB';
+          const icon=e.overlapsBlock?'⚠ ':'';
+          return`<span style="font-size:10px;background:${bg};color:${color};border-radius:4px;padding:1px 5px;display:inline-block;">${icon}${e.clientName} ${e.from}–${e.to}</span>`;
+        }).join('')+
+      '</div>';
+    }
+    return`<div class="staff-opt${isCur?' current':''}" style="${hasConflict?'border:1.5px solid #F0997B;':''}${extraStyle||''}" onclick="${assignFn}">
+      <div class="av av-s" style="width:28px;height:28px;font-size:10px">${ini(s.name)}</div>
+      <div style="flex:1"><div class="staff-opt-name">${s.name}${isCur?' \u2713':''} ${hasConflict?'<span style="font-size:11px;color:#D85A30">⚠</span>':''}</div>
+      ${schedHtml}${note||''}</div>
+    </div>`;
+  }
+
+  // Categorise pod members
+  const podFull=[],podPartial=[],podNone=[];
+  pod.forEach(sid=>{
+    const s=gsN(sid);if(!s)return;
+    const av=getAvailSlots(sid);
+    if(slots.every(sl=>av.includes(sl)))podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
+    else if(av.length>=4)podPartial.push({sid,av});
+    else podNone.push({sid});
+  });
+  podFull.sort((a,b)=>a.usedOther!==b.usedOther?(a.usedOther?1:-1):b.score-a.score);
+
+  // Non-pod staff with full or partial (≥1hr) availability and no conflict
+  const npFull=[],npPartial=[];
+  S.staff.forEach(s=>{
+    if(podSet.has(s.id))return;
+    const av=getAvailSlots(s.id);if(!av.length)return;
+    const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
+    const coversAll=slots.every(sl=>av.includes(sl));
+    if(coversAll&&!conflict.hasConflict)npFull.push({sid:s.id,av});
+    else if(!coversAll&&av.length>=4&&!conflict.hasConflict)npPartial.push({sid:s.id,av});
+  });
+
+  // Show current split coverage at top of modal
+  const splits=blk?.splits;
+  let currentCoverageHtml='';
+  if(splits&&splits.length){
+    const blockSlots=blk.isTemp?blk.slots:slotsInBlock(blockFrom,blockTo);
+    const coveredSlots=new Set();
+    splits.forEach(sp=>{
+      const spCOs=getStaffCallout(sp.sid);
+      const calledOutM=new Set();
+      spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
+      slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl)&&!calledOutM.has(t2m(sl)))coveredSlots.add(sl);});
+    });
+    const uncoveredSlots=blockSlots.filter(sl=>!coveredSlots.has(sl));
+    const uncoveredDesc=uncoveredSlots.length
+      ?`<div style="font-size:11px;color:#b87a00;font-weight:600;margin-top:6px;">⏱ Still uncovered: ${uncoveredSlots.length*15}m (${uncoveredSlots[0]} – ${slotEndDisplay(uncoveredSlots[uncoveredSlots.length-1],blockTo)})</div>`
+      :'<div style="font-size:11px;color:#1D9E75;font-weight:600;margin-top:6px;">✅ Fully covered!</div>';
+    currentCoverageHtml=`<div style="background:#E1F5EE;border:1px solid #5DCAA5;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:#085041;margin-bottom:6px;">Current coverage</div>
+      ${splits.map(sp=>{
+        const spCOs=getStaffCallout(sp.sid);
+        const partialOut=spCOs.filter(co=>co.fromM!==undefined);
+        const coNote=partialOut.length?`<span style="font-size:10px;color:#b87a00;margin-left:4px;">(out ${partialOut.map(co=>coLabel(co)).join(', ')})</span>`:'';
+        return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <div class="av av-s" style="width:22px;height:22px;font-size:8px">${ini(gsN(sp.sid)?.name||'?')}</div>
+          <span style="font-size:12px;font-weight:500;flex:1">${gsN(sp.sid)?.name}${coNote}</span>
+          <span style="font-size:11px;color:#085041">${sp.from} – ${sp.to}</span>
+          <button onclick="removeSplit('${cid}','${day}',${isTemp?-1:blockIdx},'${sp.sid}','${tempId||''}')" style="background:none;border:none;color:#D85A30;cursor:pointer;font-size:14px;padding:0 2px;">×</button>
+        </div>`;
+      }).join('')}
+      ${uncoveredDesc}
+      <button class="unassign-btn" style="margin-top:8px;" onclick="clearAllSplits('${cid}','${day}',${isTemp?-1:blockIdx},'${tempId||''}')">Clear all assignments</button>
+    </div>`;
+  }
+
+  // Remove assignment button at TOP so it's always visible regardless of list length
+  let removeBtn='';
+  if(currentSid||isTemp){
+    removeBtn=`<button class="unassign-btn" style="margin-bottom:8px;" onclick="doAssign('${cid}','${day}',${isTemp?-1:blockIdx},null,'${tempId||''}')">✕ Remove assignment</button>`;
+  }
+  if(isTemp){
+    removeBtn+=`<button class="unassign-btn" style="color:#534AB7;border-color:#534AB7;margin-bottom:8px;margin-top:${currentSid?'4':'0'}px;" onclick="deleteTempBlock('${tempId}')">🗑 Delete this temp block</button>`;
+  }
+  let html=currentCoverageHtml+removeBtn;
+
+  // 1. Pod — full block
+  if(podFull.length){
+    html+='<div class="modal-section">✅ Pod — covers full block</div>';
+    podFull.forEach(o=>{
+      const cf=chkConflict(o.sid,slots,cid,isTemp?-1:blockIdx,tempId||null);
+      let note='';
+      if(cf.hasConflict){note=`<div style="font-size:10px;color:#D85A30;margin-top:2px;font-weight:500">⚠ Conflict with: ${cf.conflicts.map(x=>x.name+' '+x.from+'-'+x.to).join(', ')}</div>`;}
+      html+=staffRow(o.sid,'',o.sid===currentSid,cf.hasConflict,note);
+    });
+  }
+
+  // 2. Pod — partial (≥1hr)
+  if(podPartial.length){
+    html+='<div class="modal-section">🕐 Pod — partially available</div>';
+    podPartial.forEach(o=>{
+      const contrib=getContribSlots(o.sid);
+      if(!contrib.length)return;
+      const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
+      const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
+      const note=alreadyAdded
+        ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
+        :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>`;
+      html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');
+    });
+  }
+
+  // 3. Pod — not available
+  if(podNone.length){
+    html+='<div class="modal-section">❌ Pod — not available</div>';
+    podNone.forEach(o=>{const s=gsN(o.sid);html+=`<div class="staff-opt unavail"><div class="av av-s" style="width:28px;height:28px;font-size:10px">${ini(s.name)}</div><div><div class="staff-opt-name">${s.name}</div><div class="staff-opt-sub">No availability during this time</div></div></div>`;});
+  }
+
+  // 4. Non-pod — full, no conflict
+  if(npFull.length){
+    html+=`<div class="modal-section" style="margin-top:10px;">🔓 Not in pod — free for full block</div>`;
+    html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available with no conflicts. Go to Pods tab to add permanently.</div>`;
+    npFull.forEach(o=>{
+      const note='';
+      html+=staffRow(o.sid,'Available — no conflicts',o.sid===currentSid,false,note,null,null);
+    });
+  }
+
+  // 5. Non-pod — partial (≥1hr), no conflict
+  if(npPartial.length){
+    html+=`<div class="modal-section">🕐 Not in pod — partially free</div>`;
+    html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block with no conflicts.</div>`;
+    npPartial.forEach(o=>{
+      const contrib=getContribSlots(o.sid);
+      if(!contrib.length)return;
+      const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
+      const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
+      const note=alreadyAdded
+        ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
+        :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>`;
+      html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');
+    });
+  }
+
+  if(!html)html='<div style="font-size:12px;color:#888;padding:.5rem 0">No staff available during this time.</div>';
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('assign-modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('assign-modal').classList.add('hidden');}
+
+// Get the block object (regular or temp)
+function getBlk(cid,day,blockIdx,tempId){
+  if(tempId)return S.tempBlocks.find(t=>t.id===tempId)||null;
+  return (gcN(cid)?.schedule[day]||[])[blockIdx]||null;
+}
+
+// Add or replace a staff member's coverage on a block for specific slots
+function doAssign(cid,day,blockIdx,newSid,tempId){
+  if(tempId){
+    // Temp blocks are already today-only — safe to write directly
+    const blk=getBlk(cid,day,blockIdx,tempId);
+    if(!blk)return;
+    blk.staffId=newSid||null;blk.splits=null;
+  } else {
+    // Regular block — store as a today-only staff override, never touch c.schedule
+    const iso=todayISO();
+    if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
+    S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+    if(newSid) S.staffOverrides[cid].push({day,blockIdx,staffId:newSid,date:iso});
+    const permStaff=gcN(cid)?.schedule[day]?.[blockIdx]?.staffId;
+    const subName=gsN(newSid)?.name;const permName=gsN(permStaff)?.name;
+    showToast((subName||'Staff')+' assigned for today only'+(permName?' (normally: '+permName+')':''),false);
+  }
+  markDirty();closeModal();render();
+}
+
+// Assign a staff member to cover only the uncovered slots they're available for
+function doAssignPartial(cid,day,blockIdx,newSid,tempId){
+  const blk=getBlk(cid,day,blockIdx,tempId);
+  if(!blk)return;
+  const blockSlots=blk.slots||slotsInBlock(blk.from,blk.to);
+  // Find already covered slots from existing splits
+  const coveredSlots=new Set();
+  if(blk.splits){
+    blk.splits.filter(sp=>sp.sid!==newSid).forEach(sp=>
+      slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl))coveredSlots.add(sl);})
+    );
+  } else if(blk.staffId&&blk.staffId!==newSid){
+    const pav=new Set(gsN(blk.staffId)?.availability[day]||[]);
+    blockSlots.forEach(sl=>{if(pav.has(sl))coveredSlots.add(sl);});
+  }
+  // Staff covers the uncovered slots they're available for
+  const staffAvail=new Set(gsN(newSid)?.availability[day]||[]);
+  const remaining=blockSlots.filter(sl=>!coveredSlots.has(sl));
+  const coverSlots=(remaining.length?remaining:blockSlots).filter(sl=>staffAvail.has(sl));
+  if(!coverSlots.length)return;
+  // Convert to time range
+  const from=coverSlots[0];
+  const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
+  const to=TIMES[lastIdx+1]||blk.to;
+  // Build splits
+  if(!blk.splits){
+    // First split: existing staff covers their portion, new staff covers theirs
+    blk.splits=[];
+    if(blk.staffId){
+      const existAv=new Set(gsN(blk.staffId)?.availability[day]||[]);
+      const existSlots=blockSlots.filter(sl=>existAv.has(sl));
+      if(existSlots.length){
+        const ef=existSlots[0];
+        const elIdx=TIMES.indexOf(existSlots[existSlots.length-1]);
+        const et=TIMES[elIdx+1]||blk.to;
+        blk.splits.push({sid:blk.staffId,from:ef,to:et});
+      }
+    }
+  }
+  // Remove existing entry for this staff, add updated one
+  blk.splits=blk.splits.filter(sp=>sp.sid!==newSid);
+  blk.splits.push({sid:newSid,from,to});
+  blk.splits.sort((a,b)=>t2m(a.from)-t2m(b.from));
+  blk.staffId=blk.splits[0].sid;
+  markDirty();
+  openAssignModal(cid,day,blockIdx,!!tempId,tempId);
+  render();
+}
+
+function removeSplit(cid,day,blockIdx,sid,tempId){
+  const blk=getBlk(cid,day,blockIdx,tempId);
+  if(!blk)return;
+  if(blk.splits){blk.splits=blk.splits.filter(sp=>sp.sid!==sid);if(!blk.splits.length)blk.splits=null;}
+  blk.staffId=blk.splits?.[0]?.sid||null;
+  markDirty();
+  renderAssignModalBody(cid,day,blockIdx,tempId,blk);
+  render();
+}
+
+function clearAllSplits(cid,day,blockIdx,tempId){
+  const blk=getBlk(cid,day,blockIdx,tempId);
+  if(!blk)return;
+  blk.staffId=null;blk.splits=null;
+  markDirty();closeModal();render();
+}
+
+// Render just the modal body (used when updating splits without closing modal)
+function renderAssignModalBody(cid,day,blockIdx,tempId,blk){
+  const existing=document.getElementById('modal-body');
+  if(!existing)return;
+  // Re-open the modal with updated state
+  openAssignModal(cid,day,blockIdx,blk?.isTemp||!!tempId,tempId);
+}
+function deleteTempBlock(id){S.tempBlocks=S.tempBlocks.filter(t=>t.id!==id);markDirty();closeModal();render();}
+
+function openTempModal(prefillDay){
+  const dayOpts=DAYS.map(d=>`<option value="${d}"${d===(prefillDay||S.selectedDay||todayDay())?'selected':''}>${d}</option>`).join('');
+  const clientOpts=S.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  const startOpts=TIMES.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const endOpts=TIMES.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('temp-body').innerHTML=`<div class="tb-row"><label>Client</label><select id="tb-client">${clientOpts}</select></div><div class="tb-row"><label>Day</label><select id="tb-day">${dayOpts}</select></div><div class="tb-row"><label>Start</label><select id="tb-start" onchange="syncTbEnd()">${startOpts}</select></div><div class="tb-row"><label>Finish</label><select id="tb-end">${endOpts}</select></div><div class="tb-row"><label>Label</label><input type="text" id="tb-label" placeholder="e.g. Doctor appt cover"></div><div style="margin-top:1rem;display:flex;gap:8px"><button class="btn btn-p" style="flex:1" onclick="createTempBlock()">Create block</button><button class="btn" onclick="closeTempModal()">Cancel</button></div><div style="font-size:11px;color:#888;margin-top:.75rem;line-height:1.6">The block will appear in Today and Weekly views. Click it to assign staff from the client's pod.</div>`;
+  syncTbEnd();document.getElementById('temp-modal').classList.remove('hidden');
+}
+function closeTempModal(){document.getElementById('temp-modal').classList.add('hidden');}
+function syncTbEnd(){const ss=document.getElementById('tb-start'),es=document.getElementById('tb-end');if(!ss||!es)return;const tgt=t2m(ss.value)+60;let best=TIMES[TIMES.length-1];TIMES.forEach(t=>{if(t2m(t)<=tgt)best=t;});es.value=best;}
+function createTempBlock(){const cid=document.getElementById('tb-client').value;const day=document.getElementById('tb-day').value;const from=document.getElementById('tb-start').value;const to=document.getElementById('tb-end').value;const label=document.getElementById('tb-label').value.trim()||'Temp block';if(t2m(to)<=t2m(from)){showToast('Finish must be after start',true);return;}const slots=slotsInBlock(from,to);const id='tb'+Date.now();const pod=S.pods[cid]||[];let bestSid=null,bestScore=-1;pod.forEach(sid=>{if(isStaffOutAt(sid,slots[0]))return;const s=gsN(sid);if(!s)return;const av=new Set(s.availability[day]||[]);if(!slots.every(sl=>av.has(sl)))return;const sc=overlap(sid,cid);if(sc>bestScore){bestScore=sc;bestSid=sid;}});S.tempBlocks.push({id,cid,day,slots,from,to,staffId:bestSid,label});markDirty();closeTempModal();render();showToast(bestSid?`Block created \u2014 assigned to ${gsN(bestSid)?.name}`:'Block created \u2014 tap it to assign staff',false);}
+
+function addBlock(cid,day){const c=gcN(cid);if(!c)return;if(!c.schedule[day])c.schedule[day]=[];const existing=c.schedule[day];let defFrom='9:00 AM';if(existing.length){const last=existing[existing.length-1];const idx=TIMES.indexOf(last.to);defFrom=TIMES[Math.min(idx+1,TIMES.length-1)]||last.to;}const defToIdx=Math.min(TIMES.indexOf(defFrom)+4,TIMES.length-1);const defTo=TIMES[defToIdx]||defFrom;existing.push({from:defFrom,to:defTo,staffId:null});markDirty();render();}
+function deleteBlock(cid,day,idx){const c=gcN(cid);if(!c)return;(c.schedule[day]||[]).splice(idx,1);if(!(c.schedule[day]||[]).length)delete c.schedule[day];markDirty();render();}
+function updateBlockFrom(cid,day,idx,val){const blk=(gcN(cid)?.schedule[day]||[])[idx];if(!blk)return;blk.from=val;if(t2m(blk.to)<=t2m(val)){const ti=TIMES.indexOf(val);blk.to=TIMES[Math.min(ti+4,TIMES.length-1)]||val;}markDirty();render();}
+function updateBlockTo(cid,day,idx,val){const blk=(gcN(cid)?.schedule[day]||[])[idx];if(!blk)return;blk.to=val;markDirty();render();}
+function updateBlockStaff(cid,day,idx,sid){const blk=(gcN(cid)?.schedule[day]||[])[idx];if(!blk)return;blk.staffId=sid||null;markDirty();render();}
+function toggleDay(cid,day){const c=gcN(cid);if(!c)return;if(c.schedule[day]){delete c.schedule[day];}else{c.schedule[day]=[];addBlock(cid,day);return;}markDirty();render();}
+
+const SB_STATE_URL=`${SUPABASE_URL}/rest/v1/schedule_state`;
+const SB_HDR={'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
+
+function applyState(p){
+  S.clients=p.clients||S.clients;
+  S.staff=p.staff||S.staff;
+  S.pods=p.pods||S.pods;
+  S.tempBlocks=p.tempBlocks||[];
+  S.calledOut=p.calledOut||[];
+  S.calledOutClients=p.calledOutClients||[];
+  // Migrate clientOverrides from old {cid:{day,from,to}} to new {cid:[{blockIdx,day,from,to}]}
+  const rawOv = p.clientOverrides || {};
+  const migratedOv = {};
+  Object.entries(rawOv).forEach(([cid, val]) => {
+    if (Array.isArray(val)) {
+      migratedOv[cid] = val; // already new format
+    } else if (val && typeof val === 'object' && val.from) {
+      // old single-object format — convert to array with blockIdx 0
+      migratedOv[cid] = [{ blockIdx: 0, day: val.day, from: val.from, to: val.to }];
+    }
+  });
+  S.clientOverrideCounts=p.clientOverrideCounts||{};
+  S.staffOverrides=p.staffOverrides||{};
+  S.acknowledgedChanges=p.acknowledgedChanges||{};
+  S.selClient=S.clients[0]?.id||null;
+  S.selStaff=S.staff[0]?.id||null;
+  S.lastSaved=p.savedAt||null;
+  S.dirty=false;
+  S.selDaysS=initSDS(S.staff);
+  updSI();
+}
+
+async function tryLoad(){
+  // First apply from localStorage instantly so UI isn't blank
+  try{
+    const r=localStorage.getItem(SK);
+    if(r){applyState(JSON.parse(r));}
+  }catch(e){}
+  // Then fetch from Supabase and overwrite if newer
+  try{
+    updSI('loading');
+    const res=await fetch(`${SB_STATE_URL}?id=eq.main`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
+    const rows=await res.json();
+    if(Array.isArray(rows)&&rows.length&&rows[0].data){
+      const p=rows[0].data;
+      const cloudTime=new Date(p.savedAt||0).getTime();
+      const localTime=new Date(S.lastSaved||0).getTime();
+      if(cloudTime>=localTime){
+        applyState(p);
+        // Update local cache
+        try{localStorage.setItem(SK,JSON.stringify(p));}catch(e){}
+        showToast('Schedule loaded from cloud',false);
+      }
+    }
+  }catch(e){
+    console.warn('Could not load from cloud, using local data',e);
+  }
+  render();
+  return true;
+}
+
+async function doSave(silent){
+  try{
+    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},savedAt:new Date().toISOString()};
+    // Save to localStorage immediately as fast cache
+    try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
+    // Save to Supabase
+    updSI('saving');
+    await fetch(SB_STATE_URL,{method:'POST',headers:SB_HDR,body:JSON.stringify({id:'main',data:d,updated_at:new Date().toISOString()})});
+    S.dirty=false;S.lastSaved=d.savedAt;updSI();
+    if(!silent)showToast('Saved ✓',false);
+  }catch(e){
+    // Fall back to just localStorage
+    try{const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,savedAt:new Date().toISOString()};localStorage.setItem(SK,JSON.stringify(d));S.dirty=false;S.lastSaved=d.savedAt;updSI();}catch(e2){}
+    if(!silent)showToast('Saved locally (cloud unavailable)',false);
+  }
+}
+
+function markDirty(){
+  S.dirty=true;updSI();
+  if(window._autoSaveTimer)clearTimeout(window._autoSaveTimer);
+  window._autoSaveTimer=setTimeout(()=>{if(S.dirty){doSave(true);}},2000);
+}
+function updSI(status){const el=document.getElementById('si');if(!el)return;if(status==='saving'){el.className='si unsaved';el.textContent='☁ Saving...';}else if(status==='loading'){el.className='si';el.textContent='☁ Loading...';}else if(S.dirty){el.className='si unsaved';el.textContent='Unsaved changes';}else if(S.lastSaved){el.className='si saved';el.textContent='☁ Saved '+new Date(S.lastSaved).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}else{el.className='si';el.textContent='Not saved yet';}}
+function showToast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(()=>t.style.display='none',2800);}
+function exportJSON(){const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,exportedAt:new Date().toISOString()};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='ccaba-scheduling-backup.json';a.click();URL.revokeObjectURL(u);showToast('Backup downloaded',false);}
+function importJSON(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const p=JSON.parse(ev.target.result);if(!p.clients||!p.staff)throw 0;S.clients=p.clients;S.staff=p.staff;S.pods=p.pods||{};S.tempBlocks=p.tempBlocks||[];S.selClient=S.clients[0]?.id||null;S.selStaff=S.staff[0]?.id||null;S.calledOut=[];S.selDaysS=initSDS(S.staff);markDirty();render();showToast('Imported — saving to cloud…',false);}catch(e){showToast('Invalid file',true);}};r.readAsText(f);};i.click();}
+function resetData(){if(!confirm('Reset ALL data to sample defaults? This will clear the cloud too.'))return;const f=JSON.parse(JSON.stringify(DD));Object.assign(S,f);S.tempBlocks=[];S.selClient=S.clients[0]?.id;S.selStaff=S.staff[0]?.id;S.calledOut=[];S.calledOutClients=[];S.clientOverrides={};S.staffOverrides={};S.dirty=true;S.selDaysS=initSDS(S.staff);try{localStorage.removeItem(SK);}catch(e){}doSave(true);render();showToast('Reset to defaults',false);}
+
+function ini(n){return n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);}
+function gcN(id){return S.clients.find(c=>c.id===id);}
+function gsN(id){return S.staff.find(s=>s.id===id);}
+function overlap(sid,cid){const c=gcN(cid),s=gsN(sid);if(!c||!s)return 0;let o=0;DAYS.forEach(d=>{const cs=new Set((c.schedule[d]||[]).flatMap(blk=>slotsInBlock(blk.from,blk.to)));(s.availability[d]||[]).forEach(t=>{if(cs.has(t))o++;});});return o;}
+function getStaffDaySlots(sid,day){const slots=new Set();S.clients.forEach(c=>{(c.schedule[day]||[]).forEach(blk=>{if(blk.staffId===sid)slotsInBlock(blk.from,blk.to).forEach(s=>slots.add(s));});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId===sid&&tb.day===day)tb.slots.forEach(s=>slots.add(s));});return slots;}
+function checkConflict(sid,day,newSlots,excludeCid,excludeBlockIdx,excludeTempId){const conflicts=[];const newSet=new Set(newSlots);S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach((blk,idx)=>{if(blk.staffId!==sid)return;if(c.id===excludeCid&&idx===excludeBlockIdx)return;const overlap=slotsInBlock(blk.from,blk.to).filter(s=>newSet.has(s));if(overlap.length>0)conflicts.push({name:c.name,from:blk.from,to:blk.to});});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId!==sid||tb.day!==day)return;if(tb.id===excludeTempId)return;if(S.calledOutClients.includes(tb.cid))return;// don't count cancelled client's temp blocks as conflicts
+const overlap=tb.slots.filter(s=>newSet.has(s));if(overlap.length>0)conflicts.push({name:gcN(tb.cid)?.name||'?'+' (temp)',from:tb.from,to:tb.to});});return{hasConflict:conflicts.length>0,conflicts};}
+function getConflictingStaffOnDay(day){const staffSlots={};S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach(blk=>{if(!blk.staffId)return;if(!staffSlots[blk.staffId])staffSlots[blk.staffId]=[];staffSlots[blk.staffId].push({slots:new Set(slotsInBlock(blk.from,blk.to)),from:blk.from,to:blk.to,name:c.name});});});(S.tempBlocks||[]).forEach(tb=>{if(!tb.staffId||tb.day!==day)return;if(S.calledOutClients.includes(tb.cid))return;// skip cancelled client temp blocks
+if(!staffSlots[tb.staffId])staffSlots[tb.staffId]=[];staffSlots[tb.staffId].push({slots:new Set(tb.slots),from:tb.from,to:tb.to,name:(gcN(tb.cid)?.name||'?')+' (temp)'});});const conflicting=new Set();Object.entries(staffSlots).forEach(([sid,blocks])=>{for(let i=0;i<blocks.length;i++){for(let j=i+1;j<blocks.length;j++){const overlap=[...blocks[i].slots].some(s=>blocks[j].slots.has(s));if(overlap){conflicting.add(sid);break;}}}});return conflicting;}
+function addPartialCallout(sid){
+  const f=document.getElementById('co-partial-from');const t=document.getElementById('co-partial-to');
+  if(!f?.value||!t?.value){showToast('Select both a from and to time',true);return;}
+  if(t2m(f.value)>=t2m(t.value)){showToast('From must be before To',true);return;}
+  S.calledOut=S.calledOut.filter(co=>co.sid!==sid||(co.fromM!==undefined&&!(t2m(f.value)<co.toM&&t2m(t.value)>co.fromM)));
+  S.calledOut.push({sid,fromM:t2m(f.value),toM:t2m(t.value)});
+  render();showToast(`Partial callout added: ${f.value} \u2013 ${t.value}`,false);
+}
+function bestForSlot(cid,day,slot,excl){const pod=S.pods[cid]||[];const res=[];pod.forEach(sid=>{if(sid===excl||isStaffOutAt(sid,slot))return;const s=gsN(sid);if(!s)return;if((s.availability[day]||[]).includes(slot))res.push({sid,score:overlap(sid,cid)});});return res.sort((a,b)=>b.score-a.score);}
+function todayDay(){const d=ALL_DAYS[new Date().getDay()];return DAYS.includes(d)?d:DAYS[0];}
+function go(t){S.tab=t;document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));render();}
+function fmtBlock(blk){return blk.from+(blk.from!==blk.to?' \u2013 '+blk.to:'');}
+function getDayBlocks(day){const out=[];S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
+out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:S.calledOutClients.includes(tb.cid)});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
+
+function getPartialGaps(bl,day){
+  // No staff at all \u2014 not a partial gap, it's fully uncovered (handled separately)
+  if(!bl.staffId&&(!bl.splits||!bl.splits.length))return null;
+  const blockFrom=bl.from, blockTo=bl.to;
+  const allSlots=bl.isTemp?bl.slots:slotsInBlock(blockFrom,blockTo);
+  if(!allSlots.length)return null;
+  const allSlotsSet=new Set(allSlots);
+
+  const coveredSlots=new Set();
+  if(bl.splits&&bl.splits.length){
+    // Split block \u2014 check each split staff member individually
+    bl.splits.forEach(sp=>{
+      if(isStaffOut(sp.sid))return; // all-day callout \u2014 covers nothing
+      const spCOs=getStaffCallout(sp.sid);
+      const calledOutM=new Set();
+      spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
+      slotsInBlock(sp.from,sp.to).forEach(sl=>{
+        if(allSlotsSet.has(sl)&&!calledOutM.has(t2m(sl)))coveredSlots.add(sl);
+      });
+    });
+  } else if(bl.staffId){
+    // Single staff \u2014 if all-day callout, nothing is covered
+    if(isStaffOut(bl.staffId))return null; // show as "called out" not partial gap
+    const staffCOs=getStaffCallout(bl.staffId);
+    const calledOutM=new Set();
+    staffCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
+    // All slots in the block are covered unless staff is partially called out during them
+    allSlots.forEach(sl=>{
+      if(!calledOutM.has(t2m(sl)))coveredSlots.add(sl);
+    });
+  }
+
+  const uncovered=allSlots.filter(sl=>!coveredSlots.has(sl));
+  if(!uncovered.length)return null;
+
+  function slotEnd(slotTime){
+    const idx=TIMES.indexOf(slotTime);const next=TIMES[idx+1];
+    return(next&&t2m(next)<=t2m(blockTo))?next:blockTo;
+  }
+  const ranges=[];let start=uncovered[0],prev=uncovered[0];
+  for(let i=1;i<uncovered.length;i++){
+    const prevIdx=TIMES.indexOf(prev),curIdx=TIMES.indexOf(uncovered[i]);
+    if(curIdx===prevIdx+1){prev=uncovered[i];}
+    else{ranges.push(start+' \u2013 '+slotEnd(prev));start=uncovered[i];prev=uncovered[i];}
+  }
+  ranges.push(start+' \u2013 '+slotEnd(prev));
+  const mins=uncovered.length*15;
+  const dur=mins>=60?Math.floor(mins/60)+'h'+(mins%60?' '+mins%60+'m':''):(mins+'m');
+  return`${dur} uncovered: ${ranges.join(', ')}`;
+}
+
+function rToday(){
+  if(!S.selectedDay)S.selectedDay=todayDay();
+  if(!S.todayFilter)S.todayFilter='all';
+  const today=S.selectedDay; const realToday=todayDay();
+  const blocks=getDayBlocks(today);
+  const todayConflicts=getConflictingStaffOnDay(today);
+
+  // Categorize blocks
+  const needsCoverage=[],conflictBlocks=[],partialBlocks=[],coveredBlocks=[],tempBlocks=[];
+  blocks.forEach(bl=>{
+    const staffOut=bl.staffId&&isStaffOut(bl.staffId);
+    const gaps=getPartialGaps(bl,today);
+    const conflict=bl.staffId&&todayConflicts.has(bl.staffId)&&!staffOut;
+    if(bl.isTemp){tempBlocks.push({bl,gaps,conflict});}
+    else if(!bl.staffId||staffOut){needsCoverage.push({bl,gaps,conflict});}
+    else if(conflict){conflictBlocks.push({bl,gaps,conflict:true});}
+    else if(gaps){partialBlocks.push({bl,gaps,conflict:false});}
+    else{coveredBlocks.push({bl,gaps,conflict:false});}
+  });
+
+  function blockCard(bl,gaps,conflict){
+    const staffOut=bl.staffId&&isStaffOut(bl.staffId);
+    const bkey=regBlock('t_'+bl.client.id+'_'+today+'_'+bl.from.replace(/ /g,'')+(bl.isTemp?bl.tempId:bl.blockIdx),{cid:bl.client.id,day:today,blockIdx:bl.blockIdx??-1,isTemp:!!bl.isTemp,tempId:bl.tempId||null});
+    let staffLine;
+    if(!bl.staffId){staffLine=`<div style="color:#993C1D;font-weight:600;font-size:12px;margin-top:3px;">⚠ Unassigned — needs coverage</div>`;}
+    else if(staffOut){staffLine=`<div style="color:#993C1D;font-weight:600;font-size:12px;margin-top:3px;">⚠ ${gsN(bl.staffId)?.name} called out</div>`;}
+    else if(conflict){staffLine=`<div style="color:#D85A30;font-weight:600;font-size:12px;margin-top:3px;">⚠ ${gsN(bl.staffId)?.name} — double booked</div>`;}
+    else if(bl.splits&&bl.splits.length>1){staffLine=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${bl.splits.map(sp=>{const spOut=isStaffOut(sp.sid);return`<span style="font-size:11px;padding:2px 8px;border-radius:12px;background:${spOut?'#F5C4B3':'#E1F5EE'};color:${spOut?'#4A1B0C':'#085041'};font-weight:500;">${gsN(sp.sid)?.name||'?'} <span style="opacity:.7;font-size:10px;">${sp.from}–${sp.to}</span></span>`;}).join('')}</div>`;}
+    else{staffLine=`<div style="font-size:13px;font-weight:600;color:#111;margin-top:3px;">${gsN(bl.staffId)?.name||'?'}</div>`;}
+    const overrideTag=bl.overridden?`<div style="margin-top:4px;"><span style="font-size:10px;background:#FFF8EC;color:#b87a00;border:1px solid #EF9F27;border-radius:6px;padding:2px 7px;">📅 Today only: ${bl.from}–${bl.to}</span></div>`:'';
+    const gapTag=gaps?`<div style="font-size:11px;color:#b87a00;font-weight:600;margin-top:4px;">⏱ Gap: ${gaps}</div>`:'';
+    const tempTag=bl.isTemp?`<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:2px 7px;border-radius:6px;">${bl.clientCancelled?'Replacement':'Temp'}${bl.label?' – '+bl.label:''}</span>`:'';
+    const leftBorder=conflict?'4px solid #D85A30':(!bl.staffId||staffOut)?'4px solid #E24B4A':gaps?'4px solid #EF9F27':bl.isTemp?'4px solid #85B7EB':'4px solid #1D9E75';
+    const bg=conflict?'#FFF5F2':(!bl.staffId||staffOut)?'#fff9f9':gaps?'#FFFDF5':bl.isTemp?'#F4F9FF':'#fff';
+    return`<div onclick="openBlock('${bkey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid rgba(0,0,0,.08);margin-bottom:8px;cursor:pointer;border-left:${leftBorder};background:${bg};" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+      <div style="min-width:90px;flex-shrink:0;padding-top:2px;">
+        <div style="font-size:11px;color:#555;font-weight:600;">${fmtBlock(bl)}</div>
+        ${tempTag?`<div style="margin-top:4px;">${tempTag}</div>`:''}
+      </div>
+      <div class="av av-c" style="width:36px;height:36px;font-size:11px;flex-shrink:0;">${ini(bl.client.name)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#111;">${bl.client.name}</div>
+        ${staffLine}${overrideTag}${gapTag}
+      </div>
+      <div style="font-size:10px;color:#ccc;align-self:center;flex-shrink:0;">tap</div>
+    </div>`;
+  }
+
+  function section(title,color,dot,items){
+    if(!items.length)return'';
+    return`<div style="margin-bottom:1.5rem;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${color};margin-bottom:10px;display:flex;align-items:center;gap:7px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;display:inline-block;"></span>${title}<span style="font-size:10px;background:${dot}22;color:${color};padding:1px 7px;border-radius:10px;margin-left:2px;">${items.length}</span>
+      </div>
+      ${items.map(({bl,gaps,conflict})=>blockCard(bl,gaps,conflict)).join('')}
+    </div>`;
+  }
+
+  const f=S.todayFilter;
+  function tileStyle(key){
+    const active=f===key;
+    const base='display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;flex:1;min-width:90px;cursor:pointer;transition:all .15s;';
+    const colors={covered:'background:#E1F5EE;',coverage:'background:#FAECE7;',partial:'background:#FFF8EC;',conflict:'background:#FAECE7;border:1px solid #D85A30;',all:'background:#F0F0F8;'};
+    const activeRing=active?'box-shadow:0 0 0 2.5px #534AB7;':'';;
+    return base+(colors[key]||colors.all)+activeRing;
+  }
+
+  const dayPicker=`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:1.25rem;">${DAYS.map(d=>`<button onclick="S.selectedDay='${d}';S.todayFilter='all';render()" style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:${d===today?'700':'400'};border:1px solid ${d===today?'#534AB7':'#ddd'};background:${d===today?'#534AB7':d===realToday?'#EEEDFE':'#fafafa'};color:${d===today?'#fff':d===realToday?'#534AB7':'#555'};cursor:pointer;">${d}${d===realToday&&d!==today?' ·':''}</button>`).join('')}</div>`;
+
+  const allCount=coveredBlocks.length+tempBlocks.length+needsCoverage.length+partialBlocks.length+conflictBlocks.length;
+  const summaryBar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem;">
+    <div onclick="S.todayFilter=S.todayFilter==='all'?'all':'all';S.todayFilter='all';render()" style="${tileStyle('all')}">
+      <span style="font-size:22px;font-weight:800;color:#444;line-height:1;">${allCount}</span>
+      <span style="font-size:11px;color:#555;font-weight:600;line-height:1.3;">All<br>Sessions</span>
+    </div>
+    <div onclick="S.todayFilter=S.todayFilter==='covered'?'all':'covered';render()" style="${tileStyle('covered')}">
+      <span style="font-size:22px;font-weight:800;color:#085041;line-height:1;">${coveredBlocks.length+tempBlocks.length}</span>
+      <span style="font-size:11px;color:#085041;font-weight:600;line-height:1.3;">Sessions<br>Covered</span>
+    </div>
+    ${needsCoverage.length||f==='coverage'?`<div onclick="S.todayFilter=S.todayFilter==='coverage'?'all':'coverage';render()" style="${tileStyle('coverage')}">
+      <span style="font-size:22px;font-weight:800;color:#993C1D;line-height:1;">${needsCoverage.length}</span>
+      <span style="font-size:11px;color:#993C1D;font-weight:600;line-height:1.3;">Need<br>Coverage</span>
+    </div>`:''}
+    ${partialBlocks.length||f==='partial'?`<div onclick="S.todayFilter=S.todayFilter==='partial'?'all':'partial';render()" style="${tileStyle('partial')}">
+      <span style="font-size:22px;font-weight:800;color:#b87a00;line-height:1;">${partialBlocks.length}</span>
+      <span style="font-size:11px;color:#b87a00;font-weight:600;line-height:1.3;">Partial<br>Issue</span>
+    </div>`:''}
+    ${conflictBlocks.length||f==='conflict'?`<div onclick="S.todayFilter=S.todayFilter==='conflict'?'all':'conflict';render()" style="${tileStyle('conflict')}">
+      <span style="font-size:22px;font-weight:800;color:#D85A30;line-height:1;">${conflictBlocks.length}</span>
+      <span style="font-size:11px;color:#D85A30;font-weight:600;line-height:1.3;">Staff<br>Conflicts</span>
+    </div>`:''}
+  </div>`;
+
+  const staffBanner=S.calledOut.length?`<div style="background:#FFF3EE;border:1px solid #F0997B;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:12px;font-weight:700;color:#4A1B0C;flex-shrink:0;">🚨 Called out:</span>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1;">${S.calledOut.map(co=>{const s=gsN(co.sid);return`<span style="background:#F5C4B3;color:#4A1B0C;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;">${s?.name||'?'} <span style="opacity:.7">(${coLabel(co)})</span> <span onclick="event.stopPropagation();rmCO('${co.sid}')" style="cursor:pointer;font-weight:800;margin-left:3px;">×</span></span>`;}).join('')}</div>
+  </div>`:'';
+  const clientBanner=S.calledOutClients.length?`<div style="background:#F0F0FE;border:1px solid #AFA9EC;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:12px;font-weight:700;color:#3C3489;flex-shrink:0;">📵 Cancelled:</span>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1;">${S.calledOutClients.map(cid=>{const c=gcN(cid);return`<span style="background:#EEEDFE;color:#3C3489;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;">${c?.name||'?'} <span onclick="event.stopPropagation();rmClientCO('${cid}')" style="cursor:pointer;font-weight:800;margin-left:3px;">×</span></span>`;}).join('')}</div>
+  </div>`:'';
+
+  // Apply filter
+  let mainContent;
+  if(blocks.length===0){
+    mainContent=`<div style="text-align:center;padding:3rem 1rem;color:#aaa;font-size:13px;">No sessions scheduled for ${today}${S.calledOutClients.length?' (some clients cancelled)':''}</div>`;
+  } else if(f==='covered'){
+    const combined=[...coveredBlocks,...tempBlocks];
+    mainContent=combined.length?`${section('Covered','⁠#085041','#1D9E75',coveredBlocks)}${section('Temp Blocks','#185FA5','#85B7EB',tempBlocks)}`:`<div style="text-align:center;padding:2rem;color:#aaa;font-size:13px;">No covered sessions</div>`;
+  } else if(f==='coverage'){
+    mainContent=needsCoverage.length?section('Needs Coverage','#993C1D','#E24B4A',needsCoverage):`<div style="text-align:center;padding:2rem;color:#aaa;font-size:13px;">No uncovered sessions — all good!</div>`;
+  } else if(f==='partial'){
+    mainContent=partialBlocks.length?section('Partial Issue','#b87a00','#EF9F27',partialBlocks):`<div style="text-align:center;padding:2rem;color:#aaa;font-size:13px;">No partial issues</div>`;
+  } else if(f==='conflict'){
+    mainContent=conflictBlocks.length?section('Staff Conflicts','#D85A30','#D85A30',conflictBlocks):`<div style="text-align:center;padding:2rem;color:#aaa;font-size:13px;">No staff conflicts</div>`;
+  } else {
+    mainContent=`${section('Needs Coverage','#993C1D','#E24B4A',needsCoverage)}${section('Staff Conflicts','#D85A30','#D85A30',conflictBlocks)}${section('Partial Gap','#b87a00','#EF9F27',partialBlocks)}${section('Covered','#085041','#1D9E75',coveredBlocks)}${section('Temp Blocks','#185FA5','#85B7EB',tempBlocks)}`;
+  }
+
+  // Build "Today's Changes" summary — auto-detects non-standard assignments and times
+  const iso=todayISO();
+  const changeItems=[];
+  // 1. Staff callouts
+  S.calledOut.forEach(co=>{
+    const s=gsN(co.sid);if(!s)return;
+    changeItems.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:'<strong>'+s.name+'</strong> called out',sub:coLabel(co),
+      undo:{type:'staff-callout',sid:co.sid,label:'Restore '+s.name}});
+  });
+  // 2. Client cancellations
+  S.calledOutClients.forEach(cid=>{
+    const c=gcN(cid);if(!c)return;
+    changeItems.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:'<strong>'+c.name+'</strong> cancelled today',
+      undo:{type:'client-cancel',cid,label:'Restore '+c.name}});
+  });
+  // 3. Today-only time adjustments (client coming at different time than scheduled)
+  Object.entries(S.clientOverrides).forEach(([cid,ovList])=>{
+    if(!Array.isArray(ovList))return;
+    const todayOvs=ovList.filter(o=>o.date===iso||(o.day===today&&!o.date));
+    if(!todayOvs.length)return;
+    const c=gcN(cid);if(!c)return;
+    const permBlocks=c.schedule[today]||[];
+    todayOvs.forEach(ov=>{
+      const orig=permBlocks[ov.blockIdx];
+      const origTime=orig?orig.from+'–'+orig.to:'(no perm block)';
+      changeItems.push({icon:'📅',color:'#b87a00',bg:'#FFF8EC',border:'#EF9F27',
+        text:'<strong>'+c.name+'</strong> time changed today',
+        sub:'Block '+(ov.blockIdx+1)+': normally '+origTime+' → today '+ov.from+'–'+ov.to,
+        undo:{type:'time-override',cid,blockIdx:ov.blockIdx,label:'Revert time'}});
+    });
+  });
+  // 4. Staff covering a client they are NOT the permanent assigned staff for.
+  //    Three cases: (a) staff override assigned via callout tool today,
+  //                 (b) permanent block has different staff than today's effective staff,
+  //                 (c) staff is covering a client they have NO permanent blocks with at all.
+  const seenSubs=new Set(); // deduplicate by "staffId|clientId"
+  getDayBlocks(today).forEach(bl=>{
+    if(!bl.staffId||bl.isTemp)return;
+    const c=gcN(bl.client.id);if(!c)return;
+    const sub=gsN(bl.staffId);if(!sub)return;
+    const permBlocks=c.schedule[today]||[];
+    const permBlock=permBlocks[bl.blockIdx];
+    const permStaffId=permBlock?.staffId||null;
+    // Is this staff member the permanent staff for ANY block of this client today?
+    const isPermanentForClient=permBlocks.some(pb=>pb.staffId===bl.staffId);
+    // Case (a)/(b): someone else is normally assigned and today's staff is different
+    const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
+    // Case (c): this staff has no permanent block with this client today at all
+    const hasNoPermanentRole=!isPermanentForClient;
+    // Also catch: block was unassigned in the permanent schedule, filled today via staff override
+    const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
+    if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+      const key=bl.staffId+'|'+c.id;
+      if(!seenSubs.has(key)){
+        seenSubs.add(key);
+        const permName=permStaffId?gsN(permStaffId)?.name:null;
+        changeItems.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',
+          text:'<strong>'+sub.name+'</strong> covering <strong>'+c.name+'</strong>',
+          sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'–'+bl.to,
+          undo:{type:'staff-assign',cid:c.id,day:today,blockIdx:bl.blockIdx,label:'Remove assignment'}});
+      }
+    }
+    // Also catch splits where a segment is covered by non-permanent staff
+    if(bl.splits&&bl.splits.length){
+      bl.splits.forEach(sp=>{
+        if(sp.sid===bl.staffId)return;
+        const spSub=gsN(sp.sid);if(!spSub)return;
+        const spIsPerm=permBlocks.some(pb=>pb.staffId===sp.sid);
+        if(!spIsPerm&&!isStaffOut(sp.sid)){
+          const key2=sp.sid+'|'+c.id;
+          if(!seenSubs.has(key2)){
+            seenSubs.add(key2);
+            const permName=permStaffId?gsN(permStaffId)?.name:null;
+            changeItems.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',
+              text:'<strong>'+spSub.name+'</strong> covering <strong>'+c.name+'</strong> ('+sp.from+'–'+sp.to+')',
+              sub:permName?'Usually: '+permName:'Not their regular client'});
+          }
+        }
+      });
+    }
+  });
+  // 5. Temp blocks
+  (S.tempBlocks||[]).filter(tb=>tb.day===today).forEach(tb=>{
+    const c=gcN(tb.cid);const s=gsN(tb.staffId);
+    changeItems.push({icon:'📌',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',
+      text:'<strong>Temp block</strong>'+(tb.label?' – '+tb.label:'')+(c?' for '+c.name:''),
+      sub:tb.from+'–'+tb.to+(s?' • '+s.name:'')+(tb.staffId?'':' • Unassigned'),
+      undo:{type:'temp-block',tempId:tb.id,label:'Delete block'}});
+  })
+  // Assign each change item a stable key; store in window._ackKeyMap keyed by integer index
+  window._ackKeyMap = {};
+  window._changeItemsData = changeItems;
+  changeItems.forEach(function(ci,i){
+    var safeKey = String(i) + '_' + String(ci.sub||'').replace(/[^a-zA-Z0-9]/g,'').slice(0,20);
+    ci._key = safeKey;
+    window._ackKeyMap[i] = safeKey;
+  });
+  window._changesPanelHTML=(function(){
+    var rows='';
+    if(changeItems.length){
+      var ackedCount=changeItems.filter(function(ci){return isAcked(ci._key);}).length;
+      rows=changeItems.map(function(ci,i){
+        var acked=isAcked(ci._key);
+        var bg=acked ? 'background:#f5f5f3;border:1px solid #ddd;opacity:.65;' : 'background:'+ci.bg+';border:1px solid '+ci.border+';';
+        var textColor=acked ? '#888' : ci.color;
+        var subColor=acked ? '#aaa' : ci.color;
+        var btnStyle=acked ? 'background:#d4edda;color:#1D9E75;border:1px solid #1D9E75;' : 'background:#fff;color:#aaa;border:1px solid #ddd;';
+        var btnLabel=acked ? '&#10003; Seen' : '&#10003;';
+        var btnTitle=acked ? 'Unacknowledge' : 'Mark as seen';
+        var subHtml=ci.sub ? '<div style="font-size:11px;color:'+subColor+';opacity:.7;margin-top:1px;">'+ci.sub+'</div>' : '';
+        var undoBtn='';
+        if(ci.undo&&!acked){
+          undoBtn='<button onclick="undoChangeItem('+i+')" title="'+ci.undo.label+'" style="flex-shrink:0;cursor:pointer;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;font-family:inherit;background:#fff3f3;color:#993C1D;border:1px solid #f0a090;">↩ Undo</button>';
+        }
+        return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;'+bg+'">'
+          +'<span style="font-size:14px;flex-shrink:0;">'+ci.icon+'</span>'
+          +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-size:12px;color:'+textColor+';">'+ci.text+'</div>'
+          +subHtml
+          +'</div>'
+          +'<div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">'
+          +undoBtn
+          +'<button onclick="togAckIdx('+i+')" title="'+btnTitle+'" style="cursor:pointer;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;font-family:inherit;'+btnStyle+'">'+btnLabel+'</button>'
+          +'</div>'
+          +'</div>';
+      }).join('');
+      if(ackedCount>0&&ackedCount<changeItems.length){
+        rows+='<div style="font-size:10px;color:#aaa;text-align:right;margin-top:2px;">'+ackedCount+' of '+changeItems.length+' acknowledged</div>';
+      } else if(ackedCount===changeItems.length){
+        rows+='<div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">&#10003; All acknowledged</div>';
+      }
+    } else {
+      rows='<div style="font-size:12px;color:#aaa;">No changes from the regular schedule today.</div>';
+    }
+    var unackedCount=changeItems.filter(function(ci){return !isAcked(ci._key);}).length;
+    var badge='';
+    if(changeItems.length){
+      badge=unackedCount>0
+        ? '<span style="font-size:10px;background:#E24B4A;color:#fff;padding:1px 8px;border-radius:10px;margin-left:6px;">'+unackedCount+' new</span>'
+        : '<span style="font-size:10px;background:#1D9E75;color:#fff;padding:1px 8px;border-radius:10px;margin-left:6px;">&#10003; all seen</span>';
+    }
+    return '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:14px 16px;margin-bottom:1.25rem;">'
+      +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;display:flex;align-items:center;">Today\'s Changes'+badge+'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:6px;">'+rows+'</div>'
+      +'</div>';
+  })()
+
+  const sidebar=`<div class="sidebar">
+    <div class="ss">
+      <div class="sl" style="font-size:12px;font-weight:700;margin-bottom:8px;">Quick Actions</div>
+      <button class="push-btn" style="width:100%;justify-content:center;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:7px;" onclick="pushToPortal()">📤 Push to Staff Portal</button>
+      <button class="btn btn-b" style="width:100%;justify-content:center;margin-bottom:6px;" onclick="openTempModal('${today}')">+ Add Temp Block</button>
+      <button class="btn btn-g" style="width:100%;justify-content:center;" onclick="doSave()">💾 Save</button>
+    </div>
+    <div class="ss">
+      <div class="sl">🚨 Staff Callout</div>
+      <select id="co-sel" style="margin-bottom:5px;"><option value="">Select staff…</option>${S.staff.map(s=>{const cos=getStaffCallout(s.id);const lbl=cos.length?cos.map(co=>' ('+coLabel(co)+')').join(''):'';return`<option value="${s.id}">${s.name}${lbl}</option>`;}).join('')}</select>
+      <div style="font-size:10px;color:#888;margin-bottom:3px;">Partial time out (blank = all day)</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
+        <select id="co-from" style="flex:1;font-size:11px;padding:4px 5px;"><option value="">From…</option>${TIMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+        <span style="font-size:10px;color:#888;">–</span>
+        <select id="co-to" style="flex:1;font-size:11px;padding:4px 5px;"><option value="">To…</option>${TIMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
+      <button class="btn btn-d" style="width:100%;" onclick="mkCO()">Mark Called Out</button>
+    </div>
+    <div class="ss">
+      <div class="sl">📵 Client Cancellation</div>
+      <select id="client-co-sel" style="margin-bottom:6px;"><option value="">Select client…</option>${S.clients.map(c=>`<option value="${c.id}"${S.calledOutClients.includes(c.id)?' disabled':''}>${c.name}${S.calledOutClients.includes(c.id)?' (cancelled)':''}</option>`).join('')}</select>
+      <button class="btn" style="width:100%;background:#534AB7;color:#fff;border-color:#534AB7;" onclick="mkClientCO()">Mark Cancelled</button>
+    </div>
+    <div class="ss" style="border-left:3px solid #EF9F27;">
+      <div class="sl" style="color:#b87a00;">📅 Today-Only Adjust</div>
+      <select id="tod-client-sel" style="margin-bottom:6px;" onchange="renderTodayOverrideBlocks()"><option value="">Select client…</option>${S.clients.map(c=>{const hasOv=(S.clientOverrides[c.id]||[]).length>0;return`<option value="${c.id}">${c.name}${hasOv?' ✓':''}</option>`;}).join('')}</select>
+      <div id="tod-block-list" style="font-size:11px;color:#888;">Select a client to see their blocks.</div>
+    </div>
+  </div>`;
+
+  return`<div style="width:100%;display:flex;align-items:flex-start;">
+    <div class="content" style="flex:1;min-width:0;padding:1.25rem;">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">
+        <div style="font-size:17px;font-weight:700;color:#111;">${today===realToday?'Today':'Sessions — '+today}</div>
+        ${today===realToday?`<div style="font-size:12px;color:#888;">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>`:''}
+        ${today!==realToday?`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:8px;">not today</span>`:''}
+        ${f!=='all'?`<button onclick="S.todayFilter='all';render()" style="font-size:11px;background:#f0f0f0;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;color:#555;">Clear filter ×</button>`:''}
+      </div>
+      ${dayPicker}
+      <div id="changes-panel-mount"></div>
+      ${staffBanner}${clientBanner}
+      ${summaryBar}
+      ${mainContent}
+    </div>
+    ${sidebar}
+  </div>`;
+}
+function rWeek(){const byDay={};DAYS.forEach(d=>byDay[d]=getDayBlocks(d));const total=Object.values(byDay).reduce((s,a)=>s+a.length,0);const cov=Object.values(byDay).reduce((s,a)=>s+a.filter(x=>x.staffId&&!isStaffOut(x.staffId)).length,0);const cols=DAYS.map(d=>{const blocks=byDay[d];const isToday=d===todayDay();const inner=blocks.length===0?`<div style="padding:8px;font-size:11px;color:#888">No sessions</div>`:blocks.map(bl=>{const co=bl.staffId&&S.calledOut.some(c=>c.sid===bl.staffId&&(c.fromM===undefined||(t2m(bl.from)>=c.fromM&&t2m(bl.from)<c.toM)));const dayConflicts=getConflictingStaffOnDay(d);const hasConflict=bl.staffId&&dayConflicts.has(bl.staffId)&&!co;const gaps=getPartialGaps(bl,d);const cls=bl.isTemp?'wtmp':co?'wco':hasConflict?'wconflict':gaps?'wpartial':bl.staffId?'wa':'wu';let sname;if(!bl.staffId){sname='Tap to assign';}else if(co){sname=`\u26a0 ${gsN(bl.staffId)?.name} (out)`;}else if(hasConflict){sname=`\u26a0 ${gsN(bl.staffId)?.name} (conflict)`;}else if(bl.splits&&bl.splits.length>1){sname=bl.splits.map(sp=>`${gsN(sp.sid)?.name} ${sp.from}\u2013${sp.to}`).join(' | ');}else{sname=gsN(bl.staffId)?.name||'?';}const overrideLine=bl.overridden?`<div class="wsb-gap">📅 Today only: ${bl.from}\u2013${bl.to}</div>`:'';const gapLine=gaps?`<div class="wsb-gap">\u23F1 ${gaps}</div>`:'';const bkey=regBlock('w_'+bl.client.id+'_'+d+'_'+bl.from.replace(/ /g,'')+(bl.isTemp?bl.tempId:bl.blockIdx),{cid:bl.client.id,day:d,blockIdx:bl.blockIdx??-1,isTemp:!!bl.isTemp,tempId:bl.tempId||null});const delBtn=bl.isTemp?`<button class="wsb-del" onclick="event.stopPropagation();deleteTempBlock('${bl.tempId}')" title="Delete block">\u2715</button>`:`<button class="wsb-del" onclick="event.stopPropagation();deleteBlock('${bl.client.id}','${d}',${bl.blockIdx})" title="Delete block">\u2715</button>`;return`<div class="wsl"><div class="wsb ${cls}" onclick="openBlock('${bkey}')"><div class="wsb-info"><div class="wsb-time">${fmtBlock(bl)}${bl.isTemp?' \u2022 TEMP':''}</div><div class="wsb-client">${bl.client.name}</div><div class="wsb-staff">${sname}</div>${overrideLine}${gapLine}</div>${delBtn}</div></div>`;}).join('');return`<div class="wdc" style="${isToday?'border-color:#7F77DD':''}"><div class="wdh" style="${isToday?'background:#EEEDFE;color:#3C3489':''}"><span>${d}${isToday?' <span style="font-size:9px;background:#7F77DD;color:#fff;padding:1px 5px;border-radius:8px;margin-left:3px">Today</span>':''}</span><span style="font-size:9px;color:#888;margin-left:4px">${blocks.length}</span><button class="btn btn-sm" style="margin-left:auto;font-size:10px;background:#E6F1FB;color:#0C447C;border-color:#85B7EB" onclick="openTempModal('${d}')">+ Temp</button></div>${inner}</div>`;}).join('');
+return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">This week</div><div style="background:#E6F1FB;border-radius:7px;padding:.625rem;margin-bottom:5px"><div style="font-size:10px;color:#042C53">Total</div><div style="font-size:20px;font-weight:500;color:#042C53">${total}</div></div><div style="background:#E1F5EE;border-radius:7px;padding:.625rem;margin-bottom:5px"><div style="font-size:10px;color:#085041">Covered</div><div style="font-size:20px;font-weight:500;color:#085041">${cov}</div></div><div style="background:#FAECE7;border-radius:7px;padding:.625rem"><div style="font-size:10px;color:#4A1B0C">Gaps</div><div style="font-size:20px;font-weight:500;color:#4A1B0C">${total-cov}</div></div></div><div class="ss" style="font-size:11px;color:#888;line-height:1.6">Click a block to reassign staff.<br>Click <strong>&#x2715;</strong> on a block to delete it.</div></div><div class="content"><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem;font-size:10px;color:#777"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#E1F5EE;display:inline-block"></span>Covered</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#FFF8EC;border:1px solid #EF9F27;display:inline-block"></span>Partial coverage</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#FAECE7;border:1px dashed #F0997B;display:inline-block"></span>Needs coverage</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#E6F1FB;border:1px dashed #85B7EB;display:inline-block"></span>Temp</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#F5C4B3;display:inline-block"></span>Called out</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#FAECE7;border:1px solid #D85A30;display:inline-block"></span>⚠ Conflict</span></div><div style="overflow-x:auto"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;min-width:600px">${cols}</div></div></div></div>`;}
+
+function rClients(){const c=gcN(S.selClient);const pods=S.pods[S.selClient]||[];return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Clients (${S.clients.length})</div><select style="margin-bottom:6px" onchange="selC(this.value)">${S.clients.map(cl=>`<option value="${cl.id}"${cl.id===S.selClient?'selected':''}>${cl.name}</option>`).join('')}</select><button class="add-btn" onclick="addC()">+ Add client</button></div></div><div class="content">${c?`<div class="card"><div class="ch"><div style="display:flex;align-items:center;gap:8px"><div class="av av-c" style="width:32px;height:32px;font-size:12px">${ini(c.name)}</div><div class="ct">${c.name}</div></div><button class="btn btn-d btn-sm" onclick="rmC('${c.id}')">Delete</button></div><div style="background:#E6F1FB;border:1px solid #85B7EB;border-radius:8px;padding:.75rem;margin-bottom:.875rem;font-size:12px;color:#042C53;line-height:1.6"><strong>How to set up the schedule:</strong> Click a day to activate it, then use <strong>+ Add block</strong> to add time blocks. Set the start and end time for each block and choose which staff member covers it. Add multiple blocks per day for split shifts.</div>${rBlockBuilder(c)}</div><div class="card"><div class="ch"><div class="ct">Pod members</div><span style="font-size:11px;color:#888">${pods.length} staff</span></div><p style="font-size:11px;color:#888;margin-bottom:.5rem">Click to add/remove (4\u20137 recommended)</p><div class="pg">${S.staff.map(s=>{const inp=pods.includes(s.id);const sc=overlap(s.id,c.id);return`<div class="pm ${inp?'ip':''}" onclick="togPod('${c.id}','${s.id}')"><div class="av av-s" style="width:22px;height:22px;font-size:8px">${ini(s.name)}</div><div><div style="font-size:11px;font-weight:500">${s.name}</div><div style="font-size:10px;color:#888">${sc} overlap</div></div>${inp?'<span style="color:#185FA5;margin-left:auto">\u2713</span>':''}</div>`;}).join('')}</div></div>`:'<div class="es">Select a client</div>'}</div></div>`;}
+
+function rBlockBuilder(c){const activeDays=DAYS.filter(d=>c.schedule[d]);let html=`<div class="blk-builder"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem"><h4 style="font-size:11px;font-weight:500;color:#777;text-transform:uppercase;letter-spacing:.04em">Schedule by day</h4></div><div class="dr2" style="margin-bottom:1rem">`;DAYS.forEach(d=>{const on=activeDays.includes(d);html+=`<button class="dp${on?' on':''}" onclick="toggleDay('${c.id}','${d}')">${d}</button>`;});html+=`</div>`;if(activeDays.length===0){html+=`<div class="it">Click a day above to start building the schedule.</div></div>`;return html;}activeDays.forEach(d=>{const blocks=c.schedule[d]||[];html+=`<div class="blk-day-row"><div class="blk-day-label">${d}</div><div class="blk-list">`;blocks.forEach((blk,idx)=>{const fromOpts=TIMES.map(t=>`<option value="${t}"${t===blk.from?'selected':''}>${t}</option>`).join('');const toOpts=TIMES.map(t=>`<option value="${t}"${t===blk.to?'selected':''}>${t}</option>`).join('');const curStaffOpts=['<option value="">-- Unassigned --</option>'].concat((S.pods[c.id]||[]).map(sid=>{const s=gsN(sid);return s?`<option value="${sid}"${sid===blk.staffId?'selected':''}>${s.name}</option>`:'';})).join('');const hasStaff=!!blk.staffId;html+=`<div class="blk-item${hasStaff?' has-staff':' no-staff'}"><select style="width:100px;font-size:11px;padding:3px 5px" onchange="updateBlockFrom('${c.id}','${d}',${idx},this.value)">${fromOpts}</select><span style="font-size:11px;color:#888">to</span><select style="width:100px;font-size:11px;padding:3px 5px" onchange="updateBlockTo('${c.id}','${d}',${idx},this.value)">${toOpts}</select><select class="blk-staff-sel" style="font-size:11px;padding:3px 5px" onchange="updateBlockStaff('${c.id}','${d}',${idx},this.value)">${curStaffOpts}</select><button class="blk-del" onclick="deleteBlock('${c.id}','${d}',${idx})" title="Remove block">\u2715</button></div>`;});html+=`</div><button class="btn btn-sm" style="font-size:11px;color:#534AB7;border-color:#534AB7;background:#EEEDFE" onclick="addBlock('${c.id}','${d}')">+ Add block</button></div>`;});html+=`</div>`;return html;}
+
+function rStaff(){const s=gsN(S.selStaff);const myC=Object.entries(S.pods).filter(([cid,pod])=>pod.includes(S.selStaff));return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Staff (${S.staff.length})</div><select style="margin-bottom:6px" onchange="selS(this.value)">${S.staff.map(st=>{const out=isStaffOut(st.id);return`<option value="${st.id}"${st.id===S.selStaff?'selected':''}>${st.name}${out?' (out)':''} \u2014 ${Object.entries(S.pods).filter(([,p])=>p.includes(st.id)).length} pods</option>`;}).join('')}</select><button class="add-btn" onclick="addS()">+ Add staff</button></div></div><div class="content">${s?`<div class="card"><div class="ch"><div style="display:flex;align-items:center;gap:8px"><div class="av av-s" style="width:32px;height:32px;font-size:12px">${ini(s.name)}</div><div><div class="ct">${s.name}</div><div style="font-size:11px;color:#888">${myC.length} client pods</div></div></div><div style="display:flex;gap:5px">${isStaffOut(s.id)?`<button class="btn btn-sm" onclick="rmCO('${s.id}')">Mark available</button>`:`<button class="btn btn-d btn-sm" onclick="mkOut('${s.id}')">Call out</button>`}<button class="btn btn-d btn-sm" onclick="rmS('${s.id}')">Delete</button></div></div><div class="sx">${rAG(s)}</div></div><div class="card"><div class="ch"><div class="ct">Client pods</div></div>${myC.length===0?`<div style="font-size:12px;color:#888">Not in any pods yet</div>`:myC.map(([cid])=>{const cl=gcN(cid);if(!cl)return'';return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid rgba(0,0,0,.1)"><div class="av av-c" style="width:22px;height:22px;font-size:8px">${ini(cl.name)}</div><span style="font-size:12px;flex:1">${cl.name}</span><span style="font-size:10px;color:#888">${overlap(s.id,cid)} overlap</span></div>`;}).join('')}</div>`:'<div class="es">Select a staff member</div>'}</div></div>`;}
+
+function rPods(){
+  const view=S.podView||'clients';
+  const toggleBtns=`<div style="display:flex;gap:6px;margin-bottom:1.25rem"><button class="btn${view==='clients'?' btn-p':''}" onclick="S.podView='clients';render()">Client pods</button><button class="btn${view==='staff'?' btn-p':''}" onclick="S.podView='staff';render()">Staff pods</button></div>`;
+  if(view==='clients'){
+    if(!S.selPodClient&&S.clients.length)S.selPodClient=S.clients[0].id;
+    const pod=S.pods[S.selPodClient]||[];
+    const clientOpts=S.clients.map(cl=>`<option value="${cl.id}"${cl.id===S.selPodClient?'selected':''}>${cl.name}</option>`).join('');
+    const podHtml=pod.length===0?`<div style="font-size:12px;color:#888;padding:.5rem 0">No staff in this pod yet.</div>`:pod.map(sid=>{const st=gsN(sid);if(!st)return'';const out=isStaffOut(sid);const sc=overlap(sid,S.selPodClient);return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08)"><div class="av av-s" style="width:28px;height:28px">${ini(st.name)}</div><div style="flex:1"><div style="font-size:13px;font-weight:500">${st.name}</div><div style="font-size:11px;color:#888">${sc} overlap${out?' \u00b7 <span style="color:#E24B4A">out today</span>':''}</div></div><button class="btn btn-d btn-sm" onclick="removePodMember('${S.selPodClient}','${sid}')">Remove</button></div>`;}).join('');
+    const ok=pod.length>=4&&pod.length<=7;
+    const notInPod=S.staff.filter(s=>!pod.includes(s.id));
+    const candidatesHtml=notInPod.length===0?`<div style="font-size:12px;color:#888;padding:.5rem 0">All staff are already in this pod.</div>`:notInPod.map(s=>{const sc=overlap(s.id,S.selPodClient);const out=isStaffOut(s.id);const myPodCount=Object.entries(S.pods).filter(([,p])=>p.includes(s.id)).length;const availDays=DAYS.filter(d=>(s.availability[d]||[]).length>0);const availSummary=availDays.length?availDays.map(d=>{const sl=s.availability[d];return d+' '+sl[0]+'2013'+availEnd(sl);}).join(', '):'No availability set';return`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(0,0,0,.1);border-radius:8px;margin-bottom:6px;background:#fafaf9"><div class="av av-s" style="width:30px;height:30px;flex-shrink:0">${ini(s.name)}</div><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:500">${s.name}</span>${out?'<span style="font-size:10px;color:#E24B4A">called out today</span>':''}<span style="font-size:10px;color:#888">\u00b7 ${myPodCount} pod${myPodCount!==1?'s':''} currently</span><span style="font-size:10px;color:#0F6E56;background:#E1F5EE;padding:1px 6px;border-radius:8px">${sc} overlap slots</span></div><div style="font-size:11px;color:#888;margin-top:2px;line-height:1.4">${availSummary}</div></div><button class="btn btn-p btn-sm" style="flex-shrink:0" onclick="addPodMemberDirect('${S.selPodClient}','${s.id}')">+ Add</button></div>`;}).join('');
+    const allPodsHtml=S.clients.map(cl=>{const p=S.pods[cl.id]||[];const pok=p.length>=4&&p.length<=7;const isSelected=cl.id===S.selPodClient;const clSchedDays=DAYS.filter(d=>(cl.schedule[d]||[]).length>0);const clSchedStr=clSchedDays.length?clSchedDays.map(d=>{const blocks=cl.schedule[d];return d+' '+blocks[0].from+'\u2013'+blocks[blocks.length-1].to;}).join(' \u00b7 '):'No schedule set';return`<div class="card" style="margin:0;cursor:pointer;${isSelected?'border-color:#534AB7;outline:2px solid #EEEDFE;':''}" onclick="S.selPodClient='${cl.id}';render()"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div class="av av-c" style="width:26px;height:26px">${ini(cl.name)}</div><div style="flex:1"><div style="font-size:12px;font-weight:500">${cl.name}</div><div style="font-size:10px;color:#888">${p.length} staff</div></div><span style="font-size:10px;padding:2px 6px;border-radius:8px;background:${pok?'#C0DD97':'#F5C4B3'};color:${pok?'#173404':'#4A1B0C'}">${pok?'Good':''+p.length}</span></div><div style="font-size:10px;color:#888;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid rgba(0,0,0,.08);line-height:1.5">${clSchedStr}</div>${p.map(sid=>{const st=gsN(sid);const out=isStaffOut(sid);if(!st)return'';const availDays=DAYS.filter(d=>(st.availability[d]||[]).length>0);const availStr=availDays.length?availDays.join(','):'no avail';return`<div style="padding:3px 0;font-size:11px;border-top:0.5px solid rgba(0,0,0,.05)"><div style="display:flex;align-items:center;gap:5px"><div class="av av-s" style="width:16px;height:16px;font-size:7px">${ini(st.name)}</div><span style="flex:1">${st.name}</span>${out?'<span style="color:#E24B4A;font-size:9px">out</span>':''}</div><div style="font-size:9px;color:#999;margin-left:21px">${availStr}</div></div>`;}).join('')}</div>`;}).join('');
+    return`<div style="width:100%;flex-direction:column" class="content">${toggleBtns}<h3 style="font-size:13px;font-weight:500;color:#888;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em">All client pods \u2014 click to manage</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.75rem;margin-bottom:1.5rem">${allPodsHtml}</div><div class="card" style="max-width:640px"><div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.875rem;flex-wrap:wrap"><div class="ct">Manage pod:</div><select style="flex:1;max-width:200px" onchange="S.selPodClient=this.value;render()">${clientOpts}</select><span style="font-size:11px;padding:3px 10px;border-radius:10px;background:${ok?'#C0DD97':'#F5C4B3'};color:${ok?'#173404':'#4A1B0C'}">${ok?'\u2713 Good':'\u26a0 '+pod.length+' (aim 4\u20137)'}</span></div>${podHtml}</div><div class="card" style="max-width:640px"><div class="ch"><div class="ct">Add a staff member</div></div><p style="font-size:11px;color:#888;margin-bottom:.625rem">See their schedule overlap and current pod load before adding</p>${candidatesHtml}</div></div>`;
+  }
+  if(!S.selPodStaff&&S.staff.length)S.selPodStaff=S.staff[0].id;
+  const myClients=Object.entries(S.pods).filter(([cid,pod])=>pod.includes(S.selPodStaff));
+  const staffOpts=S.staff.map(st=>`<option value="${st.id}"${st.id===S.selPodStaff?'selected':''}>${st.name}</option>`).join('');
+  const podsHtml=myClients.length===0?`<div style="font-size:12px;color:#888;padding:.5rem 0">Not in any client pods yet.</div>`:myClients.map(([cid])=>{const c=gcN(cid);if(!c)return'';const sc=overlap(S.selPodStaff,cid);const pod=S.pods[cid]||[];return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08)"><div class="av av-c" style="width:28px;height:28px">${ini(c.name)}</div><div style="flex:1"><div style="font-size:13px;font-weight:500">${c.name}</div><div style="font-size:11px;color:#888">${sc} overlap \u00b7 ${pod.length} in pod</div></div><button class="btn btn-d btn-sm" onclick="removePodMember('${cid}','${S.selPodStaff}')">Remove</button></div>`;}).join('');
+  const notInFor=S.clients.filter(c=>!(S.pods[c.id]||[]).includes(S.selPodStaff));
+  const candidatesHtml2=notInFor.length===0?`<div style="font-size:12px;color:#888;padding:.5rem 0">Already in every client's pod.</div>`:notInFor.map(c=>{const sc=overlap(S.selPodStaff,c.id);const podSize=(S.pods[c.id]||[]).length;const podOk=podSize>=4&&podSize<=7;const schedDays=DAYS.filter(d=>(c.schedule[d]||[]).length>0);const schedSummary=schedDays.length?schedDays.map(d=>{const blocks=c.schedule[d];const first=blocks[0],last=blocks[blocks.length-1];return d+' '+first.from+'\u2013'+last.to;}).join(', '):'No schedule set';return`<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(0,0,0,.1);border-radius:8px;margin-bottom:6px;background:#fafaf9"><div class="av av-c" style="width:30px;height:30px;flex-shrink:0">${ini(c.name)}</div><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:500">${c.name}</span><span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${podOk?'#C0DD97':'#F5C4B3'};color:${podOk?'#173404':'#4A1B0C'}">${podSize} in pod</span><span style="font-size:10px;color:#0F6E56;background:#E1F5EE;padding:1px 6px;border-radius:8px">${sc} overlap slots</span></div><div style="font-size:11px;color:#888;margin-top:2px;line-height:1.4">${schedSummary}</div></div><button class="btn btn-p btn-sm" style="flex-shrink:0" onclick="addStaffToPodDirect('${S.selPodStaff}','${c.id}')">+ Add</button></div>`;}).join('');
+  const allStaffHtml=S.staff.map(st=>{const myC=Object.entries(S.pods).filter(([cid,pod])=>pod.includes(st.id));const out=isStaffOut(st.id);const isSelected=st.id===S.selPodStaff;const stAvailDays=DAYS.filter(d=>(st.availability[d]||[]).length>0);const stAvailStr=stAvailDays.length?stAvailDays.map(d=>{const sl=st.availability[d];return d+' '+sl[0]+'2013'+availEnd(sl);}).join(' \u00b7 '):'No availability set';return`<div class="card" style="margin:0;cursor:pointer;${isSelected?'border-color:#534AB7;outline:2px solid #EEEDFE;':''}" onclick="S.selPodStaff='${st.id}';render()"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><div class="av av-s" style="width:26px;height:26px">${ini(st.name)}</div><div style="flex:1"><div style="font-size:12px;font-weight:500">${st.name}${out?' <span style="color:#E24B4A;font-size:10px">(out)</span>':''}</div><div style="font-size:10px;color:#888">${myC.length} client${myC.length!==1?'s':''}</div></div></div><div style="font-size:10px;color:#888;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid rgba(0,0,0,.08);line-height:1.5">${stAvailStr}</div>${myC.map(([cid])=>{const c=gcN(cid);if(!c)return'';const schedDays=DAYS.filter(d=>(c.schedule[d]||[]).length>0);const schedStr=schedDays.length?schedDays.join(','):'no sched';const podSize=(S.pods[cid]||[]).length;return`<div style="padding:3px 0;font-size:11px;border-top:0.5px solid rgba(0,0,0,.05)"><div style="display:flex;align-items:center;gap:5px"><div class="av av-c" style="width:16px;height:16px;font-size:7px">${ini(c.name)}</div><span style="flex:1">${c.name}</span><span style="font-size:9px;color:#999">${podSize}/pod</span></div><div style="font-size:9px;color:#999;margin-left:21px">${schedStr}</div></div>`;}).join('')}</div>`;}).join('');
+  return`<div style="width:100%;flex-direction:column" class="content">${toggleBtns}<h3 style="font-size:13px;font-weight:500;color:#888;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em">All staff pods \u2014 click to manage</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.75rem;margin-bottom:1.5rem">${allStaffHtml}</div><div class="card" style="max-width:640px"><div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.875rem;flex-wrap:wrap"><div class="ct">Manage pods for:</div><select style="flex:1;max-width:200px" onchange="S.selPodStaff=this.value;render()">${staffOpts}</select><span style="font-size:11px;color:#888">${myClients.length} client pod${myClients.length!==1?'s':''}</span></div>${podsHtml}</div><div class="card" style="max-width:640px"><div class="ch"><div class="ct">Add to a client's pod</div></div><p style="font-size:11px;color:#888;margin-bottom:.625rem">See pod size and schedule overlap before adding</p>${candidatesHtml2}</div></div>`;
+}
+
+function addPodMemberDirect(cid,sid){if(!S.pods[cid])S.pods[cid]=[];if(!S.pods[cid].includes(sid))S.pods[cid].push(sid);markDirty();render();showToast('Added to pod',false);}
+function addStaffToPodDirect(sid,cid){if(!S.pods[cid])S.pods[cid]=[];if(!S.pods[cid].includes(sid))S.pods[cid].push(sid);markDirty();render();showToast('Added to pod',false);}
+function addPodMember(cid){const sel=document.getElementById('add-pod-sel');if(!sel?.value)return;const sid=sel.value;if(!S.pods[cid])S.pods[cid]=[];if(!S.pods[cid].includes(sid))S.pods[cid].push(sid);markDirty();render();}
+function removePodMember(cid,sid){if(!S.pods[cid])return;S.pods[cid]=S.pods[cid].filter(s=>s!==sid);markDirty();render();}
+function addStaffToPod(sid){const sel=document.getElementById('add-client-pod-sel');if(!sel?.value)return;const cid=sel.value;if(!S.pods[cid])S.pods[cid]=[];if(!S.pods[cid].includes(sid))S.pods[cid].push(sid);markDirty();render();}
+
+function rCallout(){
+  const mode=S.calloutMode||'staff';
+  const modeBtns=`<div style="display:flex;gap:6px;margin-bottom:1rem"><button class="btn${mode==='staff'?' btn-p':''}" onclick="S.calloutMode='staff';render()">Staff Callout</button><button class="btn${mode==='client'?'':''}" style="${mode==='client'?'background:#534AB7;color:#fff;border-color:#534AB7':''}" onclick="S.calloutMode='client';render()">Client Cancellation</button></div>`;
+  if(mode==='staff'){
+    const aff=[];
+    const cos=getStaffCallout(S.calloutStaff);
+    const allDayOut=cos.some(co=>co.fromM===undefined);
+    if(S.calloutStaff){S.clients.forEach(c=>{DAYS.forEach(d=>{(c.schedule[d]||[]).forEach((blk,idx)=>{if(blk.staffId===S.calloutStaff){
+      // Only include this block if staff is out during it
+      const blkM=t2m(blk.from);
+      const isAffected=allDayOut||cos.some(co=>co.fromM!==undefined&&blkM>=co.fromM&&blkM<co.toM);
+      if(!isAffected)return;
+      const slots=slotsInBlock(blk.from,blk.to);const best=bestForSlot(c.id,d,slots[0],S.calloutStaff);aff.push({cid:c.id,day:d,blockIdx:idx,from:blk.from,to:blk.to,best});}});});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId===S.calloutStaff){const blkM=t2m(tb.from);const isAffected=allDayOut||cos.some(co=>co.fromM!==undefined&&blkM>=co.fromM&&blkM<co.toM);if(!isAffected)return;const best=bestForSlot(tb.cid,tb.day,tb.slots[0],S.calloutStaff);aff.push({cid:tb.cid,day:tb.day,blockIdx:-1,from:tb.from,to:tb.to,best,isTemp:true,tempId:tb.id});}});}
+    const calloutDesc=cos.length?cos.map(co=>`<span style="background:#F5C4B3;color:#4A1B0C;padding:1px 8px;border-radius:8px;font-size:11px;">${coLabel(co)}</span>`).join(' '):'not marked out';
+    const calloutActions=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      ${allDayOut
+        ?`<button class="btn btn-sm" onclick="rmCO('${S.calloutStaff}')">Mark fully available</button>`
+        :`<button class="btn btn-d btn-sm" onclick="mkOut('${S.calloutStaff}')">Mark out all day</button>`}
+      ${cos.length&&!allDayOut?`<button class="btn btn-sm" onclick="rmCO('${S.calloutStaff}')">Clear partial callout</button>`:''}
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+      <span style="font-size:11px;color:#888;">Partial out:</span>
+      <select id="co-partial-from" style="font-size:11px;padding:3px 5px;"><option value="">From...</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select>
+      <span style="font-size:10px;color:#888;">–</span>
+      <select id="co-partial-to" style="font-size:11px;padding:3px 5px;"><option value="">To...</option>${TIMES.map(t=>`<option>${t}</option>`).join('')}</select>
+      <button class="btn btn-d btn-sm" onclick="addPartialCallout('${S.calloutStaff}')">Add</button>
+    </div>`;
+    return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Staff</div>${S.staff.map(s=>{const cos=getStaffCallout(s.id);const allDay=cos.some(co=>co.fromM===undefined);const partial=!allDay&&cos.length>0;return`<div class="si2 ${S.calloutStaff===s.id?'sel':''}" onclick="S.calloutStaff='${s.id}';render()"><div class="av av-s">${ini(s.name)}</div><span class="nm">${s.name}</span>${allDay?'<span class="bx" style="background:#F5C4B3;color:#4A1B0C">Out all day</span>':partial?`<span class="bx" style="background:#FAC775;color:#412402">Partial out</span>`:''}</div>`;}).join('')}</div></div><div class="content">${modeBtns}${!S.calloutStaff?`<div class="es">Select a staff member to see their sessions and coverage options</div>`:`<div class="cob"><div class="cot">\u26a0 ${gsN(S.calloutStaff)?.name}</div><div style="font-size:11px;color:#888;margin-bottom:8px;">Currently out: ${calloutDesc}</div>${calloutActions}</div><div class="card"><div class="ch"><div class="ct">Affected sessions &amp; coverage suggestions</div></div>${aff.length===0?`<div style="font-size:12px;color:#888">No affected sessions${cos.length?' for the marked out time':' — mark a time range above'}.</div>`:aff.map(a=>{const c=gcN(a.cid);return`<div style="padding:8px 0;border-bottom:0.5px solid rgba(0,0,0,.1)"><div style="display:flex;align-items:center;gap:7px;margin-bottom:6px"><div class="av av-c" style="width:22px;height:22px;font-size:8px">${ini(c?.name||'?')}</div><strong style="font-size:12px">${c?.name} \u2014 ${a.day} ${a.from}${a.from!==a.to?' \u2013 '+a.to:''}${a.isTemp?' (temp)':''}</strong></div>${a.best.length===0?`<div style="font-size:11px;color:#D85A30">No pod members available</div>`:a.best.slice(0,3).map((opt,i)=>{const st=gsN(opt.sid);const tier=i===0?'mg':i===1?'mo':'mp';const lbl=i===0?'Best match':i===1?'Good':'Available';return`<div class="co2"><div style="display:flex;align-items:center;gap:7px"><div class="av av-s" style="width:22px;height:22px;font-size:8px">${ini(st?.name||'?')}</div><div><div style="font-size:12px;font-weight:500">${st?.name}</div><div style="font-size:10px;color:#888">${opt.score} overlap</div></div></div><div style="display:flex;align-items:center;gap:6px"><span class="${tier}">${lbl}</span><button class="btn btn-p btn-sm" onclick="doAssign('${a.cid}','${a.day}',${a.blockIdx},'${opt.sid}','${a.tempId||''}');render()">Assign</button></div></div>`;}).join('')}</div>`;}).join('')}</div>`}</div></div>`;
+  }
+  const selC=gcN(S.calloutClient);
+const hasOverride=(S.clientOverrides[S.calloutClient]||[]).length>0;
+    const ovList=S.clientOverrides[S.calloutClient]||[];
+    const overrideUI=`<div style="margin-top:10px;padding:10px;background:#FFF8EC;border:1px solid #EF9F27;border-radius:8px;">
+      <div style="font-size:11px;font-weight:700;color:#b87a00;margin-bottom:6px;">📅 Today-only time adjustment</div>
+      ${hasOverride
+        ?`<div style="font-size:12px;color:#b87a00;margin-bottom:8px;">${ovList.map(o=>`Block adjusted: <strong>${o.from} – ${o.to}</strong>`).join('<br>')}</div>
+           <button class="btn btn-sm" onclick="clearClientOverride('${S.calloutClient}')">✕ Clear all overrides</button>`
+        :`<div style="font-size:11px;color:#888;margin-bottom:6px;">Use the Today tab sidebar "📅 Today-only schedule adjust" section to adjust individual blocks.</div>`
+      }
+    </div>`;
+  let freedStaff=[];
+  if(isCancelled&&selC){const freedSlots={};DAYS.forEach(d=>{(selC.schedule[d]||[]).forEach(blk=>{if(!blk.staffId)return;if(!freedSlots[blk.staffId])freedSlots[blk.staffId]=[];freedSlots[blk.staffId].push({day:d,from:blk.from,to:blk.to});});});freedStaff=Object.entries(freedSlots).map(([sid,slots])=>({sid,slots,name:gsN(sid)?.name||'?'}));}
+  return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Clients</div>${S.clients.map(c=>{const cancelled=S.calledOutClients.includes(c.id);const hasOv=(S.clientOverrides[c.id]||[]).length>0;return`<div class="si2 ${S.calloutClient===c.id?'sel':''}" onclick="S.calloutClient='${c.id}';render()"><div class="av av-c">${ini(c.name)}</div><span class="nm">${c.name}</span>${cancelled?'<span class="bx" style="background:#EEEDFE;color:#3C3489">Cancelled</span>':hasOv?'<span class="bx" style="background:#FFF8EC;color:#b87a00">Adjusted</span>':''}</div>`;}).join('')}</div></div><div class="content">${modeBtns}${!S.calloutClient?`<div class="es">Select a client to manage their today settings</div>`:`<div class="cob" style="background:#F0F0FE;border-color:#AFA9EC;"><div class="cot" style="color:#3C3489;">📵 ${selC?.name}</div><div style="font-size:12px;color:#534AB7;margin-bottom:.625rem">Cancelling removes all their sessions from Today's view and frees up their assigned staff.</div><div style="display:flex;gap:6px">${isCancelled?`<button class="btn btn-sm" onclick="rmClientCO('${S.calloutClient}')">✓ Restore — mark as attending</button>`:`<button class="btn btn-sm" style="background:#534AB7;color:#fff;border-color:#534AB7" onclick="mkClientCO2('${S.calloutClient}')">Mark ${selC?.name} as cancelled today</button>`}</div>${!isCancelled?overrideUI:''}</div>${isCancelled&&freedStaff.length>0?`<div class="card"><div class="ch"><div class="ct">🟢 Staff now freed up</div></div><p style="font-size:12px;color:#888;margin-bottom:.75rem">These staff members had sessions with ${selC?.name} and are now available.</p>${freedStaff.map(f=>`<div style="padding:10px 0;border-bottom:0.5px solid rgba(0,0,0,.1)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div class="av av-s" style="width:28px;height:28px">${ini(f.name)}</div><strong style="font-size:13px">${f.name}</strong></div><div style="display:flex;flex-wrap:wrap;gap:5px">${f.slots.map(sl=>`<span style="background:#E1F5EE;color:#085041;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600">${sl.day} ${sl.from} \u2013 ${sl.to} \u2014 now free</span>`).join('')}</div></div>`).join('')}</div>`:''}${!isCancelled?`<div class="card"><div class="ch"><div class="ct">Scheduled sessions for ${selC?.name}</div></div>${DAYS.map(d=>{const blocks=selC?.schedule[d]||[];if(!blocks.length)return'';return`<div style="padding:6px 0;border-bottom:0.5px solid rgba(0,0,0,.08)"><strong style="font-size:11px;color:#534AB7">${d}</strong><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:5px">${blocks.map(blk=>`<span style="background:#E6F1FB;color:#185FA5;padding:2px 9px;border-radius:8px;font-size:11px">${blk.from} \u2013 ${blk.to}${blk.staffId?' \u2014 '+gsN(blk.staffId)?.name:' \u2014 unassigned'}</span>`).join('')}</div></div>`;}).join('')||'<div style="font-size:12px;color:#888">No scheduled sessions.</div>'}</div>`:''}`}</div></div>`;
+}
+
+function rData(){const tab=S.edTab||'clients';if(!S.edSelClient&&S.clients.length)S.edSelClient=S.clients[0].id;return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">What to edit</div><div class="si2 ${tab==='clients'?'sel':''}" onclick="setET('clients')"><span class="nm">Clients &amp; schedules</span></div><div class="si2 ${tab==='staff'?'sel':''}" onclick="setET('staff')"><span class="nm">Staff &amp; availability</span></div></div><div class="ss"><div class="sl">How it works</div><div style="font-size:11px;color:#888;line-height:1.7">${tab==='clients'?'Select a client, click a day to activate it, then use <strong>+ Add block</strong> to set time ranges and assign staff. Add multiple blocks for split shifts.':'Click a time to start a range, click another to fill all 15-min slots between.'}</div></div><div class="ss"><button class="btn btn-g" style="width:100%" onclick="doSave()">Save now</button></div></div><div class="content">${tab==='clients'?rEDClients():rES()}</div></div>`;}
+
+function rEDClients(){if(!S.edSelClient&&S.clients.length)S.edSelClient=S.clients[0].id;const c=gcN(S.edSelClient);const listHtml=S.clients.map(cl=>`<div class="si2 ${S.edSelClient===cl.id?'sel':''}" onclick="S.edSelClient='${cl.id}';render()"><div class="av av-c">${ini(cl.name)}</div><span class="nm">${cl.name}</span></div>`).join('');return`<div style="display:flex;gap:1rem;align-items:flex-start"><div style="width:170px;flex-shrink:0"><div class="sl" style="margin-bottom:.5rem">Clients</div>${listHtml}<button class="add-btn" onclick="addCED()">+ Add client</button></div><div style="flex:1;min-width:0">${c?rBlockBuilder(c):'<div class="es">Select a client</div>'}</div></div>`;}
+
+function rES(){let h=`<div class="card"><div class="ch"><div class="ct">Staff availability</div><button class="btn btn-p btn-sm" onclick="addS()">+ Add staff</button></div>`;S.staff.forEach(s=>{const exp=S.expEdit===s.id;const selDays=S.selDaysS[s.id]||new Set();const activeDays=DAYS.filter(d=>selDays.has(d));const totalSlots=activeDays.reduce((n,d)=>n+(s.availability[d]||[]).length,0);h+=`<div style="border-bottom:0.5px solid rgba(0,0,0,.1);padding:10px 0"><div style="display:flex;align-items:center;gap:8px"><input class="ie" value="${s.name}" onblur="rnS('${s.id}',this.value)"><span style="font-size:11px;color:#888;white-space:nowrap">${activeDays.join(', ')||'No days'} &middot; ${totalSlots} slots</span><button class="btn btn-sm" onclick="togExp('${s.id}')">${exp?'Hide':'Edit availability'}</button><button class="btn btn-d btn-sm" onclick="rmS('${s.id}')">Del</button></div>`;if(exp){const rStart=S.rType==='staff'&&S.rEid===s.id?S.rStart:null;const rDay=S.rType==='staff'&&S.rEid===s.id?S.rDay:null;h+=`<div class="exs"><div style="font-size:11px;font-weight:500;color:#777;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.625rem">Select days</div><div class="dr2">`;DAYS.forEach(d=>{const on=selDays.has(d);h+=`<button class="dp${on?' on':''}" onclick="togSD('${s.id}','${d}')">${d}</button>`;});h+=`</div>`;if(activeDays.length>0){h+=rStart?`<div style="font-size:11px;color:#0F6E56;background:#E1F5EE;border-radius:6px;padding:5px 10px;margin-top:6px">Range started at <strong>${rStart}</strong> on <strong>${rDay}</strong> \u2014 click an end time</div>`:`<div class="it">Click a time to start a range, click another to fill all 15-min slots between them.</div>`;activeDays.forEach(d=>{const sel=new Set(s.availability[d]||[]);const allOn=TIMES.every(t=>sel.has(t));h+=`<div style="margin-top:.875rem"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:12px;font-weight:500;color:#534AB7">${d}</span><span style="font-size:11px;color:#888">${sel.size} slots</span><span style="font-size:11px;color:#534AB7;cursor:pointer;text-decoration:underline;margin-left:auto" onclick="${allOn?`clrSD('${s.id}','${d}')`:` saSD('${s.id}','${d}')`}">${allOn?'Clear all':'Select all'}</span></div><div style="display:flex;flex-wrap:wrap;gap:4px">`;TIMES.forEach(t=>{const on=sel.has(t);const isS=rStart===t&&rDay===d;h+=`<button style="padding:5px 9px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:2px solid ${on?'#1D9E75':isS?'#1D9E75':'rgba(0,0,0,.12)'};background:${on?'#1D9E75':isS?'#9FE1CB':'#fff'};color:${on||isS?'#fff':isS?'#04342C':'#777'};font-family:inherit;white-space:nowrap" onclick="clkST('${s.id}','${d}','${t}')">${t}</button>`;});h+=`</div></div>`;});}else{h+=`<div class="it" style="margin-top:.5rem">Click a day above to set availability.</div>`;}h+=`</div>`;}h+=`</div>`;});return h+'</div>';}
+
+function rAG(s){const assignedBlocks={};DAYS.forEach(d=>{assignedBlocks[d]=[];});S.clients.forEach(c=>{DAYS.forEach(d=>{(c.schedule[d]||[]).forEach(blk=>{if(blk.staffId!==s.id)return;assignedBlocks[d].push({clientName:c.name,from:blk.from,to:blk.to});});});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId!==s.id)return;if(!assignedBlocks[tb.day])assignedBlocks[tb.day]=[];assignedBlocks[tb.day].push({clientName:(gcN(tb.cid)?.name||'?')+' (temp)',from:tb.from,to:tb.to});});const slotMap={};DAYS.forEach(d=>{slotMap[d]={};(assignedBlocks[d]||[]).forEach(blk=>{slotsInBlock(blk.from,blk.to).forEach(sl=>{if(!slotMap[d][sl])slotMap[d][sl]=[];slotMap[d][sl].push(blk);});});});const SLOT_H=22,COL_W=110,LABEL_W=135;let out='';out+=`<div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.625rem;font-size:10px;color:#777"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#9FE1CB;display:inline-block"></span>Scheduled</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#E6F1FB;border:0.5px solid #85B7EB;display:inline-block"></span>Available</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#f0f0ee;display:inline-block"></span>Unavailable</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#FAECE7;border:1.5px solid #D85A30;display:inline-block"></span>&#x26A0; Conflict</span></div>`;out+=`<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:${LABEL_W+COL_W*5}px"><thead><tr><th style="width:${LABEL_W}px;background:#fff;position:sticky;top:0;z-index:3;border-right:1px solid rgba(0,0,0,.08)"></th>`;DAYS.forEach(d=>{const hasConflict=TIMES.some(t=>(slotMap[d][t]||[]).length>1);out+=`<th style="width:${COL_W}px;text-align:center;font-size:10px;font-weight:500;color:#888;padding:4px 3px;text-transform:uppercase;background:#fff;position:sticky;top:0;z-index:2">${d}${hasConflict?' <span style="color:#D85A30">&#x26A0;</span>':''}</th>`;});out+=`</tr></thead><tbody>`;const consumed={};DAYS.forEach(d=>{consumed[d]=new Set();});TIMES.forEach(t=>{out+=`<tr>`;const nextIdx=TIMES.indexOf(t)+1;const nextT=nextIdx<TIMES.length?TIMES[nextIdx]:null;out+=`<td style="font-size:9px;color:#999;text-align:right;padding:0 8px 0 0;height:${SLOT_H}px;white-space:nowrap;vertical-align:middle;border-right:1px solid rgba(0,0,0,.08)">${nextT?t+' \u2013 '+nextT:t}</td>`;DAYS.forEach(d=>{if(consumed[d].has(t))return;const av=(s.availability[d]||[]).includes(t);const blocks=slotMap[d][t]||[];if(blocks.length===0){out+=av?`<td style="background:#E6F1FB;border:0.5px solid #85B7EB;height:${SLOT_H}px"></td>`:`<td style="background:#f0f0ee;border:0.5px solid rgba(0,0,0,.07);height:${SLOT_H}px"></td>`;return;}if(blocks.length>1){let runEnd=TIMES.indexOf(t);while(runEnd+1<TIMES.length){const next=TIMES[runEnd+1];if((slotMap[d][next]||[]).length>1)runEnd++;else break;}const runSlots=TIMES.slice(TIMES.indexOf(t),runEnd+1);const rowspan=runSlots.length;runSlots.slice(1).forEach(sl=>consumed[d].add(sl));const blockH=rowspan*SLOT_H;const names=blocks.map(b=>b.clientName);const displayNames=names.join(' & ');const shortNames=displayNames.length>20?displayNames.slice(0,19)+'\u2026':displayNames;const segTo=runSlots[runSlots.length-1];out+=`<td rowspan="${rowspan}" style="vertical-align:top;padding:2px;border:0.5px solid rgba(0,0,0,.06)"><div style="background:#FAECE7;border:2px solid #D85A30;border-radius:5px;height:${blockH-6}px;padding:4px 6px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start"><div style="font-size:11px;font-weight:700;color:#D85A30;white-space:nowrap">&#x26A0; Conflict</div><div style="font-size:10px;color:#993C1D;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortNames}</div><div style="font-size:9px;color:#993C1D;margin-top:1px">${t} \u2013 ${segTo}</div></div></td>`;return;}const blk=blocks[0];const blockSlots=slotsInBlock(blk.from,blk.to);const startIdx=blockSlots.indexOf(t);if(startIdx<0){out+=`<td style="background:#f0f0ee;border:0.5px solid rgba(0,0,0,.07);height:${SLOT_H}px"></td>`;return;}let runEnd=startIdx;while(runEnd+1<blockSlots.length){const next=blockSlots[runEnd+1];if(consumed[d].has(next))break;if((slotMap[d][next]||[]).length>1)break;if((slotMap[d][next]||[])[0]!==blk)break;runEnd++;}const runSlots=blockSlots.slice(startIdx,runEnd+1);const rowspan=runSlots.length;runSlots.slice(1).forEach(sl=>consumed[d].add(sl));const blockH=rowspan*SLOT_H;const shortName=blk.clientName.length>14?blk.clientName.slice(0,13)+'\u2026':blk.clientName;out+=`<td rowspan="${rowspan}" style="vertical-align:top;padding:2px;border:0.5px solid rgba(0,0,0,.06)"><div style="background:#9FE1CB;border:1px solid #1D9E75;border-radius:5px;height:${blockH-6}px;padding:4px 6px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start"><div style="font-size:11px;font-weight:600;color:#04342C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortName}</div><div style="font-size:10px;color:#0F6E56;margin-top:2px">${blk.from} \u2013 ${blk.to}</div></div></td>`;});out+=`</tr>`;});out+=`</tbody></table></div>`;return out;}
+
+function rSave(){const hs=!!S.lastSaved;const sd=S.lastSaved?new Date(S.lastSaved).toLocaleString():null;return`<div style="width:100%;flex-direction:column" class="content"><h2 style="font-size:15px;font-weight:500;margin-bottom:1.25rem">Save &amp; Load</h2><div class="sp"><h3>Browser storage</h3><div style="font-size:12px;color:#888;margin-bottom:.75rem;line-height:1.6">Saves in this browser.${hs?`<br><span style="color:#1D9E75">Last saved: ${sd}</span>`:''}${S.dirty?`<br><span style="color:#EF9F27">Unsaved changes</span>`:''}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-g" onclick="doSave()">Save now</button>${hs?`<button class="btn" onclick="ldSt()">Reload saved data</button>`:''}</div></div><div class="sp"><h3>Download backup</h3><div style="font-size:12px;color:#888;margin-bottom:.75rem">Downloads a .json file to your computer.</div><button class="btn btn-p" onclick="exportJSON()">Download .json backup</button></div><div class="sp"><h3>Load from file</h3><div style="font-size:12px;color:#888;margin-bottom:.75rem">Restore from a backup file.</div><button class="btn" onclick="importJSON()">Load from .json file</button></div><div class="sp" style="border-color:#F0997B"><h3>Reset</h3><div style="font-size:12px;color:#888;margin-bottom:.75rem">Wipes everything and restores sample data.</div><button class="btn btn-d" onclick="resetData()">Reset to sample data</button></div></div>`;}
+
+function selC(id){S.selClient=id;render();}function selS(id){S.selStaff=id;render();}function selCO(id){S.calloutStaff=id;render();}
+function setET(t){S.edTab=t;S.expEdit=null;S.rStart=null;render();}
+function togExp(id){S.expEdit=S.expEdit===id?null:id;if(S.expEdit!==id)S.rStart=null;render();}
+function togPod(cid,sid){if(!S.pods[cid])S.pods[cid]=[];const i=S.pods[cid].indexOf(sid);if(i>=0)S.pods[cid].splice(i,1);else S.pods[cid].push(sid);markDirty();render();}
+function togSS(sid,day,slot){const s=gsN(sid);if(!s)return;if(!s.availability[day])s.availability[day]=[];const i=s.availability[day].indexOf(slot);if(i>=0)s.availability[day].splice(i,1);else s.availability[day].push(slot);markDirty();render();}
+function togSD(sid,day){const s=gsN(sid);if(!s)return;if(!S.selDaysS[sid])S.selDaysS[sid]=new Set();const sel=S.selDaysS[sid];if(sel.has(day)){sel.delete(day);delete s.availability[day];}else{sel.add(day);if(!s.availability[day])s.availability[day]=[];}if(S.rEid===sid){S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;}markDirty();render();}
+function clkST(sid,day,time){const s=gsN(sid);if(!s)return;if(!s.availability[day])s.availability[day]=[];if(S.rType==='staff'&&S.rEid===sid&&S.rStart&&S.rDay===day){const lo=Math.min(t2m(S.rStart),t2m(time));const hi=Math.max(t2m(S.rStart),t2m(time));const inR=TIMES.filter(t=>t2m(t)>=lo&&t2m(t)<=hi);const sel=new Set(s.availability[day]);inR.forEach(t=>sel.add(t));s.availability[day]=[...sel];S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;markDirty();render();}else if(S.rType==='staff'&&S.rEid===sid&&S.rStart===time&&S.rDay===day){const sel=new Set(s.availability[day]);if(sel.has(time))sel.delete(time);else sel.add(time);s.availability[day]=[...sel];S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;markDirty();render();}else{S.rStart=time;S.rDay=day;S.rType='staff';S.rEid=sid;render();}}
+function saSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[...TIMES];markDirty();render();}
+function clrSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[];markDirty();render();}
+function rnS(id,val){if(val.trim()){const s=gsN(id);if(s)s.name=val.trim();markDirty();render();}}
+function mkCO(){
+  const sel=document.getElementById('co-sel');if(!sel?.value)return;
+  const sid=sel.value;
+  const fromEl=document.getElementById('co-from');const toEl=document.getElementById('co-to');
+  const fromV=fromEl?.value;const toV=toEl?.value;
+  S.calledOut=S.calledOut.filter(co=>co.sid!==sid);
+  if(fromV&&toV&&t2m(fromV)<t2m(toV)){
+    S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV)});
+    showToast(`${gsN(sid)?.name} out ${fromV} \u2013 ${toV}`,false);
+  } else {
+    S.calledOut.push({sid});
+    showToast(`${gsN(sid)?.name} marked out all day`,false);
+  }
+  render();
+}
+function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});render();}
+function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);render();}
+function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO2(cid){if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function rmClientCO(cid){S.calledOutClients=S.calledOutClients.filter(c=>c!==cid);markDirty();render();showToast(`Client restored — sessions back on schedule`,false);}
+function renderTodayOverrideBlocks(){
+  const cid=document.getElementById('tod-client-sel')?.value;
+  const el=document.getElementById('tod-block-list');
+  if(!el)return;
+  if(!cid){el.innerHTML='<span style="color:#888;font-size:11px;">Select a client to see their blocks.</span>';return;}
+  const c=gcN(cid); const day=todayDay();
+  const permBlocks=c?.schedule[day]||[];
+  const rawOvList=S.clientOverrides[cid];
+  const ovList=Array.isArray(rawOvList)?rawOvList:[];
+
+  // How many blocks to show today — default to permanent schedule count, or stored count
+  const storedCount=S.clientOverrideCounts?.[cid]||permBlocks.length||1;
+  const blockCount=parseInt(document.getElementById('tod-block-count')?.value||storedCount);
+
+  // Block count selector
+  const countSel=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+    <span style="font-size:11px;color:#666;font-weight:600;">How many blocks today?</span>
+    <select id="tod-block-count" style="font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid #ccc;" onchange="saveTodayBlockCount('${cid}');renderTodayOverrideBlocks();">
+      ${[1,2,3,4,5].map(n=>`<option value="${n}"${n===blockCount?'selected':''}>${n} block${n>1?'s':''}</option>`).join('')}
+    </select>
+    <span style="font-size:10px;color:#888;">(permanent: ${permBlocks.length})</span>
+  </div>`;
+
+  // Build rows for blockCount blocks
+  const rows=Array.from({length:blockCount},(_,idx)=>{
+    const permBlk=permBlocks[idx]; // may be undefined if adding extra blocks
+    const ov=ovList.find(o=>o.day===day&&o.blockIdx===idx);
+    const permLabel=permBlk?`${permBlk.from} – ${permBlk.to}`:'(no permanent block)';
+    return`<div style="margin-bottom:10px;padding:8px;background:${ov?'#FFF8EC':'#f9f9f9'};border-radius:6px;border:1px solid ${ov?'#EF9F27':'#e0e0e0'};">
+      <div style="font-size:11px;font-weight:600;color:#444;margin-bottom:5px;">Block ${idx+1}${permBlk?`: ${permLabel}`:''}${ov?` <span style="color:#b87a00;">→ ${ov.from} – ${ov.to} today</span>`:''}</div>
+      <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;">
+        <select id="tod-from-${idx}" style="flex:1;min-width:70px;font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid #ccc;">
+          <option value="">From...</option>${TIMES.map(t=>`<option value="${t}"${ov&&ov.from===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+        <span style="font-size:10px;color:#888;">–</span>
+        <select id="tod-to-${idx}" style="flex:1;min-width:70px;font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid #ccc;">
+          <option value="">To...</option>${TIMES.map(t=>`<option value="${t}"${ov&&ov.to===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+        <button style="font-size:10px;padding:3px 7px;border-radius:4px;background:#EF9F27;color:#fff;border:none;cursor:pointer;" onclick="applyBlockOverride('${cid}',${idx})">Set</button>
+        ${ov?`<button style="font-size:10px;padding:3px 7px;border-radius:4px;background:#fff;color:#888;border:1px solid #ccc;cursor:pointer;" onclick="clearBlockOverride('${cid}',${idx})">Clear</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Clear all button if any overrides exist
+  const clearAll=ovList.length?`<button style="font-size:10px;padding:3px 8px;border-radius:4px;background:#fff;color:#D85A30;border:1px solid #D85A30;cursor:pointer;margin-top:4px;" onclick="clearClientOverride('${cid}');renderTodayOverrideBlocks();">✕ Clear all overrides</button>`:'';
+
+  el.innerHTML=countSel+rows+clearAll;
+}
+
+function saveTodayBlockCount(cid){
+  const val=parseInt(document.getElementById('tod-block-count')?.value||1);
+  if(!S.clientOverrideCounts)S.clientOverrideCounts={};
+  S.clientOverrideCounts[cid]=val;
+}
+
+function applyBlockOverride(cid,blockIdx){
+  const day=todayDay();
+  const from=document.getElementById(`tod-from-${blockIdx}`)?.value;
+  const to=document.getElementById(`tod-to-${blockIdx}`)?.value;
+  if(!from||!to){showToast('Select both a from and to time',true);return;}
+  if(t2m(to)<=t2m(from)){showToast('To time must be after from time',true);return;}
+  setClientOverride(cid,day,blockIdx,from,to);
+  setTimeout(renderTodayOverrideBlocks,100);
+}
+
+function clearBlockOverride(cid,blockIdx){
+  clearClientOverride(cid,todayDay(),blockIdx);
+  setTimeout(renderTodayOverrideBlocks,100);
+}
+
+function applyTodayOverride(){
+  showToast('Use the block controls above to set overrides',false);
+}
+function clearTodayOverride(){
+  const cid=document.getElementById('tod-client-sel')?.value;
+  if(!cid){showToast('Select a client first',true);return;}
+  clearClientOverride(cid);
+  setTimeout(renderTodayOverrideBlocks,100);
+}
+function applyOverride(cid){
+  const day=document.getElementById('ov-day')?.value;
+  const blockIdx=parseInt(document.getElementById('ov-block-idx')?.value||'0');
+  const from=document.getElementById('ov-from')?.value;
+  const to=document.getElementById('ov-to')?.value;
+  if(!from||!to){showToast('Please select both a from and to time',true);return;}
+  if(t2m(to)<=t2m(from)){showToast('To time must be after from time',true);return;}
+  setClientOverride(cid,day,blockIdx,from,to);
+}
+function addC(){const name=prompt('New client name:');if(!name?.trim())return;const id='c'+Date.now();S.clients.push({id,name:name.trim(),schedule:{}});S.pods[id]=[];S.selClient=id;markDirty();render();}
+function addCED(){const name=prompt('New client name:');if(!name?.trim())return;const id='c'+Date.now();S.clients.push({id,name:name.trim(),schedule:{}});S.pods[id]=[];S.edSelClient=id;markDirty();render();}
+function addS(){const name=prompt('New staff name:');if(!name?.trim())return;const id='s'+Date.now();S.staff.push({id,name:name.trim(),availability:{}});S.selDaysS[id]=new Set();S.selStaff=id;markDirty();render();}
+function rmC(id){if(!confirm('Remove this client?'))return;S.clients=S.clients.filter(c=>c.id!==id);delete S.pods[id];S.tempBlocks=S.tempBlocks.filter(t=>t.cid!==id);S.selClient=S.clients[0]?.id||null;markDirty();render();}
+function rmS(id){if(!confirm('Remove this staff member?'))return;S.staff=S.staff.filter(s=>s.id!==id);Object.keys(S.pods).forEach(cid=>{S.pods[cid]=S.pods[cid].filter(s=>s!==id);});S.clients.forEach(c=>{DAYS.forEach(d=>{(c.schedule[d]||[]).forEach(blk=>{if(blk.staffId===id)blk.staffId=null;});});});S.calledOut=S.calledOut.filter(s=>s!==id);S.tempBlocks.forEach(tb=>{if(tb.staffId===id)tb.staffId=null;});delete S.selDaysS[id];S.selStaff=S.staff[0]?.id||null;markDirty();render();}
+function ldSt(){tryLoad().then(()=>showToast('Reloaded from cloud',false));}
+
+const AI_SK='podscheduler_ai_key';
+function loadAIKey(){try{const k=localStorage.getItem(AI_SK);if(k)S.aiKey=k;}catch(e){}}
+function saveAIKey(k){try{localStorage.setItem(AI_SK,k);}catch(e){}}
+function buildScheduleContext(){const lines=[];lines.push('=== TODAY IS '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]+' ===');lines.push('\n=== CLIENTS & SCHEDULES ===');S.clients.forEach(c=>{lines.push('\nClient: '+c.name);const pod=(S.pods[c.id]||[]).map(sid=>gsN(sid)?.name||sid).join(', ');lines.push('  Pod ('+(S.pods[c.id]||[]).length+' staff): '+pod);const days=Object.keys(c.schedule||{});if(!days.length){lines.push('  No schedule set');return;}days.forEach(d=>{(c.schedule[d]||[]).forEach(blk=>{const sname=blk.staffId?gsN(blk.staffId)?.name:'UNASSIGNED';lines.push('  '+d+': '+blk.from+' \u2013 '+blk.to+' \u2192 '+sname);});});});lines.push('\n=== STAFF & AVAILABILITY ===');S.staff.forEach(s=>{const out=isStaffOut(s.id);const pods=Object.entries(S.pods).filter(([cid,pod])=>pod.includes(s.id)).map(([cid])=>gcN(cid)?.name||cid).join(', ');lines.push('\nStaff: '+s.name+(out?' [CALLED OUT TODAY]':''));lines.push('  Clients: '+(pods||'none'));const avDays=Object.keys(s.availability||{}).filter(d=>s.availability[d].length>0);avDays.forEach(d=>{const sl=s.availability[d];const from=sl[0],to=availEnd(sl);lines.push('  Available '+d+': '+from+' \u2013 '+to);});});if((S.tempBlocks||[]).length){lines.push('\n=== TEMP BLOCKS ===');S.tempBlocks.forEach(tb=>{const sname=tb.staffId?gsN(tb.staffId)?.name:'UNASSIGNED';lines.push('  '+gcN(tb.cid)?.name+' | '+tb.day+' '+tb.from+'\u2013'+tb.to+' | '+sname+(tb.label?' ('+tb.label+')':''));});}if(S.calledOut.length){lines.push('\n=== CALLED OUT TODAY ===');lines.push(S.calledOut.map(sid=>gsN(sid)?.name||sid).join(', '));}return lines.join('\n');}
+async function sendAIMessage(){const inp=document.getElementById('ai-inp');if(!inp)return;const text=inp.value.trim();if(!text)return;if(!S.aiKey){showToast('Enter your API key first',true);return;}inp.value='';inp.style.height='44px';S.aiMessages.push({role:'user',content:text});S.aiLoading=true;render();setTimeout(()=>{const msgs=document.getElementById('ai-msgs');if(msgs)msgs.scrollTop=msgs.scrollHeight;},50);try{const systemPrompt=`You are a scheduling assistant for a care/support services organization. You have full access to the current schedule data below. Help the user manage their schedule, suggest coverage solutions, identify conflicts or gaps, and answer questions about staff and client assignments. Be concise and practical. When suggesting changes, be specific (name the staff member, client, day, and time). Format lists clearly.\n\nCURRENT SCHEDULE DATA:\n${buildScheduleContext()}`;const messages=S.aiMessages.map(m=>({role:m.role,content:m.content}));const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-ipc':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:systemPrompt,messages})});const data=await res.json();if(data.error){throw new Error(data.error.message||'API error');}const reply=data.content?.[0]?.text||'No response';S.aiMessages.push({role:'assistant',content:reply});}catch(e){S.aiMessages.push({role:'error',content:'Error: '+e.message+'. Check your API key and try again.'});}S.aiLoading=false;render();setTimeout(()=>{const msgs=document.getElementById('ai-msgs');if(msgs)msgs.scrollTop=msgs.scrollHeight;},50);}
+function askSuggestion(text){const inp=document.getElementById('ai-inp');if(inp){inp.value=text;}sendAIMessage();}
+function rAI(){loadAIKey();const keySet=!!S.aiKey;const suggestions=['Who is overloaded this week?','Which clients have the weakest pod coverage?','Are there any scheduling conflicts I should know about?','Suggest how to balance the workload more evenly','Who can cover if someone calls out today?'];const msgsHtml=S.aiMessages.map(m=>{const cls=m.role==='error'?'error':m.role;return`<div class="ai-msg ${cls}">${m.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;}).join('');const typingHtml=S.aiLoading?`<div class="ai-msg assistant"><div class="ai-typing"><span></span><span></span><span></span></div></div>`:'';return`<div class="ai-wrap">${!keySet?`<div class="ai-key-wrap"><div style="font-size:13px;font-weight:500;margin-bottom:.5rem">Enter your Anthropic API key to enable AI</div><div style="font-size:11px;color:#666;margin-bottom:.75rem">Your key is stored only in this browser and only sent to Anthropic when you ask a question. Get a key at <strong>console.anthropic.com</strong>.</div><div style="display:flex;gap:8px"><input type="password" id="ai-key-inp" placeholder="sk-ant-..." style="flex:1;font-family:monospace;font-size:12px"><button class="btn btn-p" onclick="const k=document.getElementById('ai-key-inp').value.trim();if(k){S.aiKey=k;saveAIKey(k);render();}else{showToast('Paste your API key first',true);}">Save key</button></div></div>`:`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem"><div style="font-size:12px;color:#1D9E75;font-weight:500">&#x2713; API key set</div><div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="S.aiMessages=[];render()">Clear chat</button><button class="btn btn-sm btn-d" onclick="S.aiKey='';try{localStorage.removeItem('${AI_SK}');}catch(e){}render()">Remove key</button></div></div>`}${S.aiMessages.length===0&&keySet?`<div><div style="font-size:12px;font-weight:500;color:#888;margin-bottom:.5rem">Suggested questions</div><div class="ai-suggestions">${suggestions.map(s=>`<button class="ai-sug" onclick="askSuggestion('${s}')">${s}</button>`).join('')}</div></div>`:''}  <div class="ai-messages" id="ai-msgs" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.75rem;padding-bottom:.5rem">${S.aiMessages.length===0&&keySet?`<div class="ai-msg system">Ask me anything about your schedule. I can see all your clients, staff, pods, and current assignments.</div>`:''} ${msgsHtml}${typingHtml}</div>${keySet?`<div class="ai-input-row"><textarea id="ai-inp" placeholder="Ask about your schedule... e.g. &quot;Alex called out Monday \u2014 who can cover?&quot;" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage();}" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea><button class="ai-send" onclick="sendAIMessage()" ${S.aiLoading?'disabled':''}>Send</button></div>`:''}</div>`;}
+
+function render(){const mc=document.getElementById('mc');if(!mc)return;const block=['pods','data','save','ai'];mc.style.display=block.includes(S.tab)?'block':'flex';window._BM={};if(S.tab==='today'){mc.innerHTML=rToday();const mp=document.getElementById('changes-panel-mount');if(mp&&window._changesPanelHTML)mp.innerHTML=window._changesPanelHTML;}else if(S.tab==='week')mc.innerHTML=rWeek();else if(S.tab==='clients')mc.innerHTML=rClients();else if(S.tab==='staff')mc.innerHTML=rStaff();else if(S.tab==='pods')mc.innerHTML=rPods();else if(S.tab==='callout')mc.innerHTML=rCallout();else if(S.tab==='data')mc.innerHTML=rData();else if(S.tab==='save')mc.innerHTML=rSave();else if(S.tab==='ai')mc.innerHTML=rAI();updSI();}
+
+tryLoad(); // async — loads from localStorage instantly, then syncs from cloud
+</script>
+</body>
+</html>
