@@ -389,16 +389,47 @@
     border: 1.5px solid rgba(255,255,255,0.35);
   }
 
-  @media (max-width: 700px) {
-    .sidebar { width: 52px; min-width: 52px; }
-    .sidebar-logo { padding: 16px 0; text-align: center; }
-    .sidebar-logo h1 { font-size: 1.3rem; }
-    .sidebar-logo p, .nav-section-label, .nav-item span:not(.icon), .sidebar-footer div { display: none; }
-    .nav-item { padding: 12px 0; justify-content: center; }
-    .nav-item .icon { font-size: 1.3rem; width: auto; }
-    .main { margin-left: 52px; padding: 20px 14px; }
+  /* ===== HAMBURGER / MOBILE NAV ===== */
+  #hamburger {
+    display: none; position: fixed; top: 12px; left: 12px; z-index: 300;
+    width: 44px; height: 44px; border-radius: 12px; border: none;
+    background: var(--blue-dark); color: #fff; font-size: 1.3rem;
+    cursor: pointer; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  }
+  #sidebar-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 149; backdrop-filter: blur(2px);
+  }
+
+  @media (max-width: 768px) {
+    #hamburger { display: flex; }
+    .sidebar {
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      z-index: 200; width: 260px; min-width: 260px;
+    }
+    .sidebar.open { transform: translateX(0); }
+    #sidebar-overlay.open { display: block; }
+    .main { margin-left: 0; padding: 70px 16px 24px; }
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
-    .assignment-grid { grid-template-columns: 1fr 1fr; }
+    .assignment-grid { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .topbar-title h2 { font-size: 1.3rem; }
+    .date-badge { font-size: 0.8rem; }
+    .card { padding: 16px 16px; }
+    /* Coverage cards stack on mobile */
+    .coverage-card { flex-direction: column !important; }
+    .coverage-actions { width: 100%; }
+    .btn-accept { width: 100%; justify-content: center; }
+    /* Weekly schedule table scrollable */
+    .weekly-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* RBT grid single column */
+    .rbt-grid { grid-template-columns: 1fr !important; }
+    /* Login box full width */
+    .staff-login-box { width: calc(100vw - 40px); padding: 32px 24px; }
+    /* Nav items bigger touch targets */
+    .nav-item { padding: 14px 24px; font-size: 0.95rem; }
   }
 
   /* ===== STAFF LOGIN ===== */
@@ -418,6 +449,10 @@
 </style>
 </head>
 <body>
+
+<!-- HAMBURGER + OVERLAY -->
+<button id="hamburger" aria-label="Open menu">☰</button>
+<div id="sidebar-overlay"></div>
 
 <!-- STAFF LOGIN SCREEN -->
 <div id="staff-login-screen">
@@ -1991,6 +2026,29 @@ function init() {
   renderCalendar();
   renderCoverageRequests();
   tryStaffAutoLogin();
+  // Hamburger menu toggle
+  var hamburger = document.getElementById('hamburger');
+  var overlay = document.getElementById('sidebar-overlay');
+  var sidebar = document.querySelector('.sidebar');
+  if (hamburger && sidebar) {
+    hamburger.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('open');
+    });
+    overlay.addEventListener('click', function() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+    });
+    // Close sidebar when a nav item is tapped on mobile
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        if (window.innerWidth <= 768) {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('open');
+        }
+      });
+    });
+  }
 }
 init();
 </script>
