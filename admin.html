@@ -778,19 +778,55 @@ function reloadData() {
 
 // ===================== AUTH =====================
 const ADMIN_USER = 'admin', ADMIN_PASS = 'circleCity2024';
+const SESSION_KEY = 'cc_admin_session';
+const INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
+var inactivityTimer = null;
+
+function showAdminApp() {
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('admin-sidebar').style.display='flex';
+  document.getElementById('admin-main').style.display='block';
+}
+
+function startInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(function() {
+    localStorage.removeItem(SESSION_KEY);
+    doLogout();
+    // Show a subtle message on the login screen
+    var err = document.getElementById('login-error');
+    err.textContent = 'Logged out due to inactivity.';
+    err.style.display = 'block';
+    err.style.color = 'var(--muted)';
+  }, INACTIVITY_MS);
+}
+
+function resetInactivity() {
+  localStorage.setItem(SESSION_KEY, Date.now().toString());
+  startInactivityTimer();
+}
+
 function doLogin() {
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
   if(u===ADMIN_USER && p===ADMIN_PASS) {
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('admin-sidebar').style.display='flex';
-    document.getElementById('admin-main').style.display='block';
+    localStorage.setItem(SESSION_KEY, Date.now().toString());
+    showAdminApp();
     renderAll();
+    startInactivityTimer();
+    // Reset timer on any activity
+    document.addEventListener('mousemove', resetInactivity, { passive: true });
+    document.addEventListener('keydown', resetInactivity, { passive: true });
+    document.addEventListener('click', resetInactivity, { passive: true });
+    document.addEventListener('touchstart', resetInactivity, { passive: true });
   } else {
+    document.getElementById('login-error').textContent = 'Incorrect credentials. Please try again.';
     document.getElementById('login-error').style.display='block';
   }
 }
 function doLogout() {
+  localStorage.removeItem(SESSION_KEY);
+  clearTimeout(inactivityTimer);
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('admin-sidebar').style.display='none';
   document.getElementById('admin-main').style.display='none';
@@ -798,11 +834,34 @@ function doLogout() {
   document.getElementById('login-pass').value='';
 }
 
+// Auto-login if session is still fresh on page load
+(function() {
+  var saved = localStorage.getItem(SESSION_KEY);
+  if(saved) {
+    var age = Date.now() - parseInt(saved, 10);
+    if(age < INACTIVITY_MS) {
+      showAdminApp();
+      // renderAll called after DOM fully ready
+      window.addEventListener('DOMContentLoaded', function() {
+        renderAll();
+        startInactivityTimer();
+        document.addEventListener('mousemove', resetInactivity, { passive: true });
+        document.addEventListener('keydown', resetInactivity, { passive: true });
+        document.addEventListener('click', resetInactivity, { passive: true });
+        document.addEventListener('touchstart', resetInactivity, { passive: true });
+      });
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  }
+})();
+
 // ===================== NAVIGATION =====================
 function showPage(id) {
   document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(id === 'coverage-mgmt') fetchAdminCoverage();
+  if(id === 'dashboard') renderDashboard();
   document.getElementById('page-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
 }
@@ -1028,14 +1087,36 @@ function renderAdminCoverage() {
       ? '<div style="margin-top:8px;font-size:0.8rem;color:var(--muted);">Recommended: <strong>' + r.recommended.join(', ') + '</strong></div>'
       : '';
     var noteHtml = r.note ? '<div style="font-size:0.75rem;color:var(--muted);margin-top:4px;font-style:italic;">' + r.note + '</div>' : '';
+    var responseLog = loadData('cc_coverage_response_log', {});
+    var log = responseLog[r.id] || [];
+    var acceptors = log.filter(function(e){ return e.response === 'accepted'; });
+    var decliners = log.filter(function(e){ return e.response === 'declined'; });
+    var responseHtml = '';
+    if(log.length) {
+      responseHtml = '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray);">'
+        + '<div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:6px;">Staff Responses</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + (acceptors.length ? '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
+          + acceptors.map(function(e){
+            return '<div style="display:inline-flex;align-items:center;gap:5px;background:#E1F5EE;border-radius:20px;padding:3px 10px;font-size:0.78rem;font-weight:600;color:#2e7d47;">'
+              + '&#10003; ' + e.name + '<span style="font-size:0.68rem;opacity:0.6;">' + e.time + '</span></div>';
+          }).join('') + '</div>' : '')
+        + (decliners.length ? '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
+          + decliners.map(function(e){
+            return '<div style="display:inline-flex;align-items:center;gap:5px;background:#f5f5f7;border-radius:20px;padding:3px 10px;font-size:0.78rem;color:var(--muted);">'
+              + '&#10007; ' + e.name + '</div>';
+          }).join('') + '</div>' : '')
+        + '</div></div>';
+    }
     return '<div class="card" style="border-left:4px solid ' + borderColor + ';opacity:' + (isClosed ? '0.55' : '1') + ';">'
       + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">'
-      + '<div>'
+      + '<div style="flex:1;">'
       + '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:' + borderColor + ';margin-bottom:4px;">' + (r.urgent ? '🚨 Urgent — ' : '📋 ') + 'Coverage Needed' + (isClosed ? ' <span style="color:#aaa;">(Filled)</span>' : '') + '</div>'
       + '<div style="font-size:1rem;font-weight:700;color:var(--text);">Client: ' + r.client + '</div>'
       + '<div style="font-size:0.85rem;color:var(--muted);margin-top:2px;">📅 ' + r.day + ' &nbsp;|&nbsp; 🕐 ' + r.time + '</div>'
       + (r.reason ? '<div style="margin-top:6px;font-size:0.8rem;background:#f5f5f7;padding:4px 10px;border-radius:6px;display:inline-block;">' + r.reason + '</div>' : '')
       + recHtml + noteHtml
+      + responseHtml
       + '</div>'
       + '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">'
       + (!isClosed ? '<button class="btn btn-green btn-sm" data-action="fill" data-idx="' + idx + '">&#10003; Mark Filled</button>' : '')
@@ -1091,11 +1172,25 @@ function renderAll() {
 // ===================== DASHBOARD =====================
 function renderDashboard() {
   const unread = feedback.filter(f=>!f.read).length;
-  document.getElementById('stat-row').innerHTML = `
-    <div class="stat-card"><div class="stat-val">${assignments.length}</div><div class="stat-label">📋 Assignments Today</div></div>
-    <div class="stat-card"><div class="stat-val">${staffList.length}</div><div class="stat-label">👥 Active RBTs</div></div>
-    <div class="stat-card"><div class="stat-val" style="color:${unread>0?'var(--coral)':'var(--green)'}">${unread}</div><div class="stat-label">💬 Unread Feedback</div></div>
-    <div class="stat-card"><div class="stat-val">${shoutoutsClient.length+shoutoutsStaff.length}</div><div class="stat-label">⭐ Shoutouts Posted</div></div>`;
+  const openReqs = adminCoverageRequests.filter(function(r){ return r.status === 'open'; }).length;
+  const responseLog = loadData('cc_coverage_response_log', {});
+  // Collect all acceptors across all open requests
+  var allAcceptors = [];
+  adminCoverageRequests.filter(function(r){ return r.status==='open'; }).forEach(function(r){
+    var log = responseLog[r.id] || [];
+    log.filter(function(e){ return e.response==='accepted'; }).forEach(function(e){
+      allAcceptors.push({ name: e.name, client: r.client, time: e.time });
+    });
+  });
+  document.getElementById('stat-row').innerHTML =
+    '<div class="stat-card"><div class="stat-val">' + assignments.length + '</div><div class="stat-label">📋 Assignments Today</div></div>'
+    + '<div class="stat-card"><div class="stat-val">' + staffList.length + '</div><div class="stat-label">👥 Active RBTs</div></div>'
+    + '<div class="stat-card"><div class="stat-val" style="color:' + (unread>0?'var(--coral)':'var(--green)') + '">' + unread + '</div><div class="stat-label">💬 Unread Feedback</div></div>'
+    + '<div class="stat-card" style="cursor:pointer;" onclick="showSection('coverage')">'
+    + '<div class="stat-val" style="color:' + (openReqs>0?'var(--coral)':'var(--green)') + '">' + openReqs + '</div>'
+    + '<div class="stat-label">🚨 Open Coverage Requests</div>'
+    + (allAcceptors.length ? '<div style="margin-top:8px;font-size:0.75rem;color:var(--green);font-weight:700;">✓ ' + allAcceptors.map(function(a){ return a.name; }).join(', ') + ' accepted</div>' : '')
+    + '</div>';
   const fb = document.getElementById('dash-feedback');
   fb.innerHTML = feedback.filter(f=>!f.read).slice(0,3).map(f=>`
     <div style="padding:10px;border-radius:8px;background:var(--coral-light);margin-bottom:8px;font-size:0.83rem;">
