@@ -1355,20 +1355,32 @@ function slotIndex(startTime) {
 }
 
 // Consistent color per client name so same client = same color across days
+// Uses a registry so each unique client gets the next available color in order
+var _clientColorRegistry = {};
+var _clientColorCounter = 0;
+var _clientPalette = [
+  {bg:'#E1F5EE', border:'#1D9E75', text:'#0e6e4f'},
+  {bg:'#FFF8EC', border:'#F5A623', text:'#a06a00'},
+  {bg:'#FFF3EE', border:'#FF6B6B', text:'#b53030'},
+  {bg:'#F0F0FE', border:'#534AB7', text:'#3a2e8a'},
+  {bg:'#FEF0FB', border:'#C471ED', text:'#8b2aad'},
+  {bg:'#E6F1FB', border:'#4A90D9', text:'#1a5fa0'},
+  {bg:'#FFFBE6', border:'#D4A017', text:'#7a5c00'},
+  {bg:'#F0FBF4', border:'#27AE60', text:'#1a6e3c'},
+  {bg:'#FDE8E8', border:'#E53935', text:'#8b0000'},
+  {bg:'#E8F4FD', border:'#1976D2', text:'#0d47a1'},
+];
 function clientColor(clientName) {
-  var palette = [
-    {bg:'#E1F5EE', border:'#1D9E75', text:'#0e6e4f'},
-    {bg:'#E6F1FB', border:'#4A90D9', text:'#1a5fa0'},
-    {bg:'#FFF8EC', border:'#F5A623', text:'#a06a00'},
-    {bg:'#F0F0FE', border:'#534AB7', text:'#3a2e8a'},
-    {bg:'#FFF3EE', border:'#FF6B6B', text:'#b53030'},
-    {bg:'#F0FBF4', border:'#27AE60', text:'#1a6e3c'},
-    {bg:'#FEF0FB', border:'#C471ED', text:'#8b2aad'},
-  ];
-  var hash = 0;
-  var s = String(clientName || '');
-  for(var i=0;i<s.length;i++) hash = (hash*31 + s.charCodeAt(i)) & 0xffff;
-  return palette[hash % palette.length];
+  var key = String(clientName || '').trim().toLowerCase();
+  if(_clientColorRegistry[key] === undefined) {
+    _clientColorRegistry[key] = _clientColorCounter % _clientPalette.length;
+    _clientColorCounter++;
+  }
+  return _clientPalette[_clientColorRegistry[key]];
+}
+function resetClientColors() {
+  _clientColorRegistry = {};
+  _clientColorCounter = 0;
 }
 
 async function fetchWeeklySchedule() {
@@ -1378,6 +1390,7 @@ async function fetchWeeklySchedule() {
   if(!bodyEl) return;
 
   try {
+    resetClientColors();
     const res = await fetch(SUPABASE_URL + '/rest/v1/staff_schedules?order=day.asc,start_time.asc', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
