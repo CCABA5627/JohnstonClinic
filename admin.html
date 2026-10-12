@@ -230,7 +230,7 @@
       <button class="btn btn-green" onclick="openModal('modal-rbt')">+ Add RBT</button>
     </div>
     <div class="card">
-      <table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Hometown</th><th>Favorite Food</th><th>Actions</th></tr></thead>
+      <table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Hometown</th><th>Favorite Food</th><th>PIN</th><th>Actions</th></tr></thead>
       <tbody id="rbt-table"></tbody></table>
     </div>
   </section>
@@ -1251,14 +1251,56 @@ function deleteAssignment(i) { assignments.splice(i,1); saveData('cc_assignments
 
 // ===================== RBT PROFILES =====================
 function renderRBTTable() {
-  document.getElementById('rbt-table').innerHTML = staffList.map((s,i)=>`
-    <tr>
-      <td><span class="avatar-sm" style="background:${colorFor(s.name)}">${initials(s.name)}</span>${s.name}</td>
-      <td>${s.role}</td>
-      <td>${s.facts.hometown||'—'}</td>
-      <td>${s.facts.fave_food||'—'}</td>
-      <td><button class="btn btn-primary btn-sm" onclick="editRBT(${i})" style="margin-right:6px;">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteRBT(${i})">Delete</button></td>
-    </tr>`).join('');
+  var accounts = loadData('cc_staff_accounts', {});
+  var el = document.getElementById('rbt-table');
+  el.innerHTML = staffList.map((s,i) => {
+    var hasPin = !!accounts[s.name];
+    return '<tr>'
+      + '<td><span class="avatar-sm" style="background:' + colorFor(s.name) + '">' + initials(s.name) + '</span>' + s.name + '</td>'
+      + '<td>' + s.role + '</td>'
+      + '<td>' + (s.facts.hometown||'—') + '</td>'
+      + '<td>' + (s.facts.fave_food||'—') + '</td>'
+      + '<td>' + (hasPin
+          ? '<span style="color:var(--green);font-weight:700;font-size:0.78rem;">✓ Set</span>'
+          : '<span style="color:var(--coral);font-size:0.78rem;">Not set</span>')
+      + '</td>'
+      + '<td>'
+      + '<button class="btn btn-primary btn-sm" data-action="edit-rbt" data-idx="' + i + '" style="margin-right:4px;">Edit</button>'
+      + '<button class="btn btn-sm" data-action="set-pin" data-idx="' + i + '" style="margin-right:4px;background:var(--gold-light);border:1.5px solid var(--gold);color:#a06000;">' + (hasPin ? '🔑 Reset PIN' : '🔑 Set PIN') + '</button>'
+      + '<button class="btn btn-danger btn-sm" data-action="delete-rbt" data-idx="' + i + '">Delete</button>'
+      + '</td></tr>';
+  }).join('');
+
+  el.onclick = function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var idx = parseInt(btn.getAttribute('data-idx'), 10);
+    var action = btn.getAttribute('data-action');
+    if (action === 'edit-rbt') editRBT(idx);
+    if (action === 'delete-rbt') deleteRBT(idx);
+    if (action === 'set-pin') openSetPin(idx);
+  };
+}
+
+function openSetPin(i) {
+  var s = staffList[i];
+  var accounts = loadData('cc_staff_accounts', {});
+  var existing = accounts[s.name] || '';
+  var pin = prompt((existing ? 'Reset PIN for ' : 'Set PIN for ') + s.name + ' (4-6 digits):' + (existing ? '\nLeave blank to remove PIN.' : ''));
+  if (pin === null) return; // cancelled
+  pin = pin.trim();
+  if (pin === '') {
+    delete accounts[s.name];
+    saveData('cc_staff_accounts', accounts);
+    showToast('PIN removed for ' + s.name + '.');
+  } else if (/^\d{4,6}$/.test(pin)) {
+    accounts[s.name] = pin;
+    saveData('cc_staff_accounts', accounts);
+    showToast('PIN set for ' + s.name + '! ✅');
+  } else {
+    showToast('PIN must be 4-6 digits only.');
+  }
+  renderRBTTable();
 }
 function editRBT(i) {
   const s=staffList[i];
