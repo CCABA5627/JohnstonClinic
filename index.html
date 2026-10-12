@@ -1326,6 +1326,51 @@ function showToast(msg, isErr) {
 // ===================== WEEKLY SCHEDULE (from scheduling app via Supabase) =====================
 const DAYS_ORDER = ['Mon','Tue','Wed','Thu','Fri'];
 
+// Fixed time slots from 8 AM to 6 PM in 1-hour rows
+const TIME_SLOTS = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM','6:00 PM'];
+
+// Parse a time string like "8:00 AM", "08:00", "8:00" into fractional hour (8.0, 13.5, etc.)
+function parseHour(t) {
+  if(!t) return null;
+  t = String(t).trim();
+  var m = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if(!m) return null;
+  var h = parseInt(m[1], 10);
+  var min = parseInt(m[2], 10);
+  var ampm = (m[3]||'').toUpperCase();
+  if(ampm === 'PM' && h !== 12) h += 12;
+  if(ampm === 'AM' && h === 12) h = 0;
+  return h + min/60;
+}
+
+// Which time slot row (0-indexed) does this entry primarily belong to?
+function slotIndex(startTime) {
+  var h = parseHour(startTime);
+  if(h === null) return -1;
+  // Snap to nearest hour slot >= 8
+  var idx = Math.round(h - 8);
+  if(idx < 0) idx = 0;
+  if(idx >= TIME_SLOTS.length) idx = TIME_SLOTS.length - 1;
+  return idx;
+}
+
+// Consistent color per client name so same client = same color across days
+function clientColor(clientName) {
+  var palette = [
+    {bg:'#E1F5EE', border:'#1D9E75', text:'#0e6e4f'},
+    {bg:'#E6F1FB', border:'#4A90D9', text:'#1a5fa0'},
+    {bg:'#FFF8EC', border:'#F5A623', text:'#a06a00'},
+    {bg:'#F0F0FE', border:'#534AB7', text:'#3a2e8a'},
+    {bg:'#FFF3EE', border:'#FF6B6B', text:'#b53030'},
+    {bg:'#F0FBF4', border:'#27AE60', text:'#1a6e3c'},
+    {bg:'#FEF0FB', border:'#C471ED', text:'#8b2aad'},
+  ];
+  var hash = 0;
+  var s = String(clientName || '');
+  for(var i=0;i<s.length;i++) hash = (hash*31 + s.charCodeAt(i)) & 0xffff;
+  return palette[hash % palette.length];
+}
+
 async function fetchWeeklySchedule() {
   const statusEl = document.getElementById('weekly-sync-status');
   const timeEl = document.getElementById('weekly-sync-time');
@@ -1333,7 +1378,6 @@ async function fetchWeeklySchedule() {
   if(!bodyEl) return;
 
   try {
-    // Pull staff_schedules which the scheduling app pushes via Supabase
     const res = await fetch(SUPABASE_URL + '/rest/v1/staff_schedules?order=day.asc,start_time.asc', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
@@ -1345,61 +1389,76 @@ async function fetchWeeklySchedule() {
       return;
     }
 
-    // Group by day
-    const byDay = {};
-    DAYS_ORDER.forEach(d => byDay[d] = []);
-    data.forEach(r => {
-      const day = r.day;
-      if(byDay[day] !== undefined) {
-        byDay[day].push(r);
-      }
+    // Group by day, then by time slot
+    var byDaySlot = {};
+    DAYS_ORDER.forEach(function(d) {
+      byDaySlot[d] = {};
+      TIME_SLOTS.forEach(function(_, si) { byDaySlot[d][si] = []; });
+    });
+    data.forEach(function(r) {
+      var day = r.day;
+      if(!byDaySlot[day]) return;
+      var si = slotIndex(r.start_time);
+      if(si < 0) si = 0;
+      byDaySlot[day][si].push(r);
     });
 
     const todayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
 
-    let html = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;overflow-x:auto;border:1px solid var(--gray);border-radius:10px;overflow:hidden;">';
-
-    // Headers
-    DAYS_ORDER.forEach(d => {
-      const isToday = d === todayName;
-      html += '<div class="week-day-header' + (isToday ? ' today-col' : '') + '">' + d + (isToday ? ' <span style="font-size:0.65rem;opacity:0.8;">(today)</span>' : '') + '</div>';
+    // Determine which slots have any data so we can hide fully empty rows
+    var slotHasData = TIME_SLOTS.map(function(_, si) {
+      return DAYS_ORDER.some(function(d) { return byDaySlot[d][si] && byDaySlot[d][si].length > 0; });
     });
 
-    // Content rows — each day column
-    html += '</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--gray);border-radius:0 0 10px 10px;border-top:none;">';
+    var gridCols = 'auto repeat(5, 1fr)';
+    var borderColor = '#e0e0e0';
 
-    DAYS_ORDER.forEach(d => {
-      const blocks = byDay[d];
-      const isToday = d === todayName;
-      html += '<div style="border-right:1px solid var(--gray);' + (isToday ? 'background:rgba(74,144,217,0.04);' : '') + 'min-height:80px;padding:4px 0;">';
-      if(!blocks.length) {
-        html += '<div class="week-empty-day">—</div>';
-      } else {
-        blocks.forEach(r => {
-          const colors = ['#E1F5EE','#E6F1FB','#FFF8EC','#F0F0FE','#FFF3EE'];
-          const borders = ['#1D9E75','#4A90D9','#F5A623','#534AB7','#FF6B6B'];
-          let hash = 0;
-          const name = r.staff_name || '';
-          for(let i=0;i<name.length;i++) hash = (hash + name.charCodeAt(i)) % 5;
-          html += '<div class="week-block" style="background:' + colors[hash] + ';border-color:' + borders[hash] + ';">'
-            + '<div class="week-block-client">' + (r.client_name || r.clients || 'Client') + '</div>'
-            + '<div class="week-block-staff">👤 ' + (r.staff_name || '—') + '</div>'
-            + '<div class="week-block-time">' + (r.start_time || '') + '–' + (r.end_time || '') + '</div>'
+    var html = '<div style="overflow-x:auto;">'
+      + '<div style="display:grid;grid-template-columns:' + gridCols + ';min-width:520px;border:1px solid ' + borderColor + ';border-radius:10px;overflow:hidden;">';
+
+    // Header row
+    html += '<div style="background:#f7f7f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">Time</div>';
+    DAYS_ORDER.forEach(function(d) {
+      var isToday = d === todayName;
+      html += '<div style="background:' + (isToday ? '#EAF2FD' : '#f7f7f9') + ';padding:8px 6px;font-size:0.8rem;font-weight:700;color:' + (isToday ? 'var(--blue)' : 'var(--text)') + ';text-align:center;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">'
+        + d + (isToday ? '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">today</span>' : '') + '</div>';
+    });
+
+    // Time rows
+    TIME_SLOTS.forEach(function(slot, si) {
+      if(!slotHasData[si]) return; // skip fully empty rows
+      var isLast = si === TIME_SLOTS.length - 1;
+      var rowBorder = isLast ? '' : 'border-bottom:1px solid ' + borderColor + ';';
+
+      // Time label cell
+      html += '<div style="padding:6px 10px;font-size:0.72rem;font-weight:600;color:var(--muted);white-space:nowrap;' + rowBorder + 'border-right:1px solid ' + borderColor + ';background:#fafafa;vertical-align:top;display:flex;align-items:flex-start;padding-top:8px;">' + slot + '</div>';
+
+      DAYS_ORDER.forEach(function(d) {
+        var isToday = d === todayName;
+        var entries = byDaySlot[d][si] || [];
+        html += '<div style="padding:4px 5px;' + rowBorder + 'border-right:1px solid ' + borderColor + ';background:' + (isToday ? 'rgba(74,144,217,0.03)' : '#fff') + ';min-height:52px;vertical-align:top;">';
+        entries.forEach(function(r) {
+          var clientKey = r.client_name || r.clients || 'Client';
+          var col = clientColor(clientKey);
+          html += '<div style="background:' + col.bg + ';border-left:3px solid ' + col.border + ';border-radius:5px;padding:4px 6px;margin-bottom:3px;font-size:0.72rem;">'
+            + '<div style="font-weight:700;color:' + col.text + ';margin-bottom:1px;">' + clientKey + '</div>'
+            + '<div style="color:#555;font-size:0.68rem;">👤 ' + (r.staff_name || '—') + '</div>'
+            + '<div style="color:#888;font-size:0.65rem;">' + (r.start_time || '') + (r.end_time ? '–' + r.end_time : '') + '</div>'
             + '</div>';
         });
-      }
-      html += '</div>';
+        html += '</div>';
+      });
     });
 
-    html += '</div>';
+    html += '</div></div>';
     bodyEl.innerHTML = html;
 
-    if(statusEl) { statusEl.textContent = '✓ Live from Scheduling'; statusEl.style.background = 'rgba(107,191,127,0.25)'; }
+    if(statusEl) { statusEl.textContent = 'Live from Scheduling'; statusEl.style.background = 'rgba(107,191,127,0.25)'; }
     if(timeEl) timeEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
 
   } catch(e) {
     if(bodyEl) bodyEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);">Could not load weekly schedule.</div>';
-    if(statusEl) { statusEl.textContent = '⚠ Connection error'; statusEl.style.background = 'rgba(255,107,107,0.2)'; }
+    if(statusEl) { statusEl.textContent = 'Connection error'; statusEl.style.background = 'rgba(255,107,107,0.2)'; }
   }
 }
 
