@@ -1908,23 +1908,36 @@ function saveCoverageWho() {
   // No-op — kept for compatibility
 }
 
-function tryStaffAutoLogin() {
-  // Re-read staff list so anyone added in admin appears in login dropdown
+function refreshLoginDropdown() {
+  // Always re-read cc_staff from localStorage (admin may have added staff in another tab)
   var latestStaff = loadData('cc_staff', null);
   if (latestStaff && Array.isArray(latestStaff) && latestStaff.length > 0) {
     staffList = latestStaff;
   }
-  // Populate name dropdown from staffList
   var sel = document.getElementById('sl-name');
+  if (!sel) return;
   var accounts = getStaffAccounts();
   var names = staffList.map(function(s){ return s.name; }).sort();
+  var current = sel.value;
   sel.innerHTML = '<option value="">— Select your name —</option>'
     + names.map(function(n){
         return '<option value="' + n + '"' + (accounts[n] ? '' : ' style="color:#aaa;"') + '>' + n + (accounts[n] ? '' : ' (no PIN)') + '</option>';
       }).join('');
-  // Wire up button and enter key
-  document.getElementById('sl-btn').addEventListener('click', doStaffLogin);
-  document.getElementById('sl-pin').addEventListener('keydown', function(e){ if(e.key==='Enter') doStaffLogin(); });
+  if (current) sel.value = current; // restore selection if still valid
+}
+
+function tryStaffAutoLogin() {
+  refreshLoginDropdown();
+  // Wire up button and enter key (only once)
+  var btn = document.getElementById('sl-btn');
+  var pin = document.getElementById('sl-pin');
+  btn.onclick = doStaffLogin;
+  pin.onkeydown = function(e){ if(e.key==='Enter') doStaffLogin(); };
+  // Refresh dropdown whenever the tab regains focus (user switched from admin tab)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') refreshLoginDropdown();
+  });
+  window.addEventListener('focus', refreshLoginDropdown);
   // Check existing session
   var session = getCurrentStaff();
   if (session) {
