@@ -1183,7 +1183,7 @@ function renderDashboard() {
     '<div class="stat-card"><div class="stat-val">' + assignments.length + '</div><div class="stat-label">📋 Assignments Today</div></div>'
     + '<div class="stat-card"><div class="stat-val">' + staffList.length + '</div><div class="stat-label">👥 Active RBTs</div></div>'
     + '<div class="stat-card"><div class="stat-val" style="color:' + (unread>0?'var(--coral)':'var(--green)') + '">' + unread + '</div><div class="stat-label">💬 Unread Feedback</div></div>'
-    + '<div class="stat-card" style="cursor:pointer;" onclick="showSection('coverage')">'
+    + '<div class="stat-card" style="cursor:pointer;" onclick="showPage(\'coverage-mgmt\')">'
     + '<div class="stat-val" style="color:' + (openReqs>0?'var(--coral)':'var(--green)') + '">' + openReqs + '</div>'
     + '<div class="stat-label">🚨 Open Coverage Requests</div>'
     + (allAcceptors.length ? '<div style="margin-top:8px;font-size:0.75rem;color:var(--green);font-weight:700;">✓ ' + allAcceptors.map(function(a){ return a.name; }).join(', ') + ' accepted</div>' : '')
