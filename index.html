@@ -2383,28 +2383,33 @@ async function initPWA() {
 
   // Show push banner if not already enabled/dismissed and browser supports it
   if (!('Notification' in window) || !('PushManager' in window)) return;
-  if (localStorage.getItem('push-enabled') === '1') return;
   if (localStorage.getItem('push-dismissed') === '1') return;
+
   if (Notification.permission === 'granted') {
-    // Already granted — just re-subscribe silently
-    const reg = await navigator.serviceWorker.ready;
-    const existing = await reg.pushManager.getSubscription();
-    if (!existing) {
-      try {
+    // Already granted — re-subscribe silently and hide button
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (!existing) {
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
         await saveSubscriptionToSupabase(sub);
-        localStorage.setItem('push-enabled', '1');
-      } catch (e) { /* VAPID key not set yet */ }
-    } else {
-      localStorage.setItem('push-enabled', '1');
-    }
+      }
+    } catch (e) { console.warn('[Push] Re-subscribe failed:', e); }
+    // Hide buttons — already enabled
+    const banner = document.getElementById('push-banner');
+    if (banner) banner.style.display = 'none';
+    const manual = document.getElementById('push-manual-btn-wrap');
+    if (manual) manual.style.display = 'none';
+    localStorage.setItem('push-enabled', '1');
     return;
   }
+
   if (Notification.permission === 'denied') return;
-  // Show banner and manual button after a short delay so page loads first
+
+  // Not yet granted — show button after short delay
   setTimeout(() => {
     const banner = document.getElementById('push-banner');
     if (banner) banner.style.display = 'flex';
