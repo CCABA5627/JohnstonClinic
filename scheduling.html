@@ -1149,14 +1149,8 @@ function rToday(){
     </div>`:''}
   </div>`;
 
-  const staffBanner=S.calledOut.length?`<div style="background:#FFF3EE;border:1px solid #F0997B;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:12px;font-weight:700;color:#4A1B0C;flex-shrink:0;">🚨 Called out:</span>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1;">${S.calledOut.map(co=>{const s=gsN(co.sid);return`<span style="background:#F5C4B3;color:#4A1B0C;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;">${s?.name||'?'} <span style="opacity:.7">(${coLabel(co)})</span> <span onclick="event.stopPropagation();rmCO('${co.sid}')" style="cursor:pointer;font-weight:800;margin-left:3px;">×</span></span>`;}).join('')}</div>
-  </div>`:'';
-  const clientBanner=S.calledOutClients.length?`<div style="background:#F0F0FE;border:1px solid #AFA9EC;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:12px;font-weight:700;color:#3C3489;flex-shrink:0;">📵 Cancelled:</span>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;flex:1;">${S.calledOutClients.map(cid=>{const c=gcN(cid);return`<span style="background:#EEEDFE;color:#3C3489;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;">${c?.name||'?'} <span onclick="event.stopPropagation();rmClientCO('${cid}')" style="cursor:pointer;font-weight:800;margin-left:3px;">×</span></span>`;}).join('')}</div>
-  </div>`:'';
+  const staffBanner='';
+  const clientBanner='';
 
   // Apply filter
   let mainContent;
@@ -1479,12 +1473,15 @@ function mkCO(){
   const fromEl=document.getElementById('co-from');const toEl=document.getElementById('co-to');
   const fromV=fromEl?.value;const toV=toEl?.value;
   S.calledOut=S.calledOut.filter(co=>co.sid!==sid);
+  const s=gsN(sid);
   if(fromV&&toV&&t2m(fromV)<t2m(toV)){
     S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV)});
-    showToast(`${gsN(sid)?.name} out ${fromV} \u2013 ${toV}`,false);
+    logEvent('staff-callout','staff-initiated',sid,s?.name||sid);
+    showToast(`${s?.name} out ${fromV} \u2013 ${toV}`,false);
   } else {
     S.calledOut.push({sid});
-    showToast(`${gsN(sid)?.name} marked out all day`,false);
+    logEvent('staff-callout','staff-initiated',sid,s?.name||sid);
+    showToast(`${s?.name} marked out all day`,false);
   }
   render();
 }
@@ -1495,7 +1492,7 @@ function logEvent(type,subtype,id,name){
 }
 function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);logEvent('staff-callout','staff-initiated',sid,s?.name||sid);render();}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);render();}
-function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);const c=gcN(cid);const sub=_lastCancelSubtype||'client-initiated';delete _lastCancelSubtype;logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
 function mkClientCO2(cid){
   const c=gcN(cid);
   const sub=confirm('Who initiated this cancellation?\n\nOK = Client called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';
