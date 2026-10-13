@@ -539,16 +539,27 @@
       </div>
       <div class="date-badge" id="today-date"></div>
     </div>
-    <div class="sync-banner">
+    <!-- TODAY'S CHANGES BOX (pulled from scheduling site) -->
+    <div id="todays-changes-box" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+      <div style="font-size:0.92rem;font-weight:700;color:#333;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        📋 Today's Changes
+        <span id="changes-badge" style="font-size:0.72rem;background:#E24B4A;color:#fff;padding:1px 8px;border-radius:10px;display:none;"></span>
+      </div>
+      <div id="todays-changes-inner" style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:0.82rem;color:var(--muted);">Loading changes...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Today's Assignments</div>
+      <div class="assignment-grid" id="assignment-grid"></div>
+    </div>
+    <!-- SYNC BANNER (moved to bottom) -->
+    <div class="sync-banner" style="margin-top:20px;">
       <div>
         <h4>🔗 Schedule Sync</h4>
         <p>Assignments pulled live from CCABA Scheduling. Last updated: <span id="sync-time">—</span></p>
       </div>
       <div class="sync-pill" id="sync-status">Connecting...</div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Today's Assignments</div>
-      <div class="assignment-grid" id="assignment-grid"></div>
     </div>
   </section>
 
@@ -917,6 +928,125 @@ async function fetchAssignmentsFromSupabase() {
     document.getElementById('sync-status').textContent = '⚠ Could not connect to database';
     renderToday();
   }
+}
+
+async function fetchTodaysChanges() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule_state?id=eq.main`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0 || !rows[0].data) return;
+    const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    renderTodaysChangesBox(raw);
+  } catch(e) {
+    // silently fail — box stays hidden
+  }
+}
+
+function renderTodaysChangesBox(S) {
+  const box = document.getElementById('todays-changes-box');
+  const inner = document.getElementById('todays-changes-inner');
+  const badge = document.getElementById('changes-badge');
+  if (!box || !inner) return;
+
+  // Figure out today's day name (Mon, Tue, etc.)
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today = DAYS[new Date().getDay()];
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  const items = [];
+
+  // 1. Staff callouts
+  const calledOut = S.calledOut || [];
+  calledOut.forEach(co => {
+    const s = (S.staff || []).find(x => x.id === co.sid);
+    if (!s) return;
+    let label = 'All day';
+    if (co.fromM !== undefined && co.toM !== undefined) {
+      const fmt = m => { const h=Math.floor(m/60); const mn=m%60; const ampm=h<12?'AM':'PM'; return (h%12||12)+(mn?':'+String(mn).padStart(2,'0'):'') +' '+ampm; };
+      label = fmt(co.fromM) + '–' + fmt(co.toM);
+    }
+    items.push({ icon: '🚨', color: '#993C1D', bg: '#FFF3EE', border: '#F0997B',
+      text: '<strong>' + s.name + '</strong> called out', sub: label });
+  });
+
+  // 2. Client cancellations
+  const calledOutClients = S.calledOutClients || [];
+  calledOutClients.forEach(cid => {
+    const c = (S.clients || []).find(x => x.id === cid);
+    if (!c) return;
+    items.push({ icon: '📵', color: '#3C3489', bg: '#F0F0FE', border: '#AFA9EC',
+      text: '<strong>' + c.name + '</strong> cancelled today' });
+  });
+
+  // 3. Today-only time overrides
+  const clientOverrides = S.clientOverrides || {};
+  Object.entries(clientOverrides).forEach(([cid, ovList]) => {
+    if (!Array.isArray(ovList)) return;
+    const todayOvs = ovList.filter(o => o.date === todayISO || (o.day === today && !o.date));
+    if (!todayOvs.length) return;
+    const c = (S.clients || []).find(x => x.id === cid);
+    if (!c) return;
+    todayOvs.forEach(ov => {
+      items.push({ icon: '📅', color: '#b87a00', bg: '#FFF8EC', border: '#EF9F27',
+        text: '<strong>' + c.name + '</strong> time adjusted today',
+        sub: 'Block ' + (ov.blockIdx + 1) + ': ' + ov.from + '–' + ov.to });
+    });
+  });
+
+  // 4. Staff covering non-regular clients
+  const seen = new Set();
+  (S.clients || []).forEach(c => {
+    const dayBlocks = (c.schedule && c.schedule[today]) || [];
+    dayBlocks.forEach((bl, bi) => {
+      if (!bl.staffId) return;
+      // Check if a staff override is in effect for today
+      const todayOverrideKey = c.id + '_' + today + '_' + bi;
+      const staffOverride = (S.staffOverrides || {})[todayOverrideKey];
+      const effectiveStaffId = staffOverride !== undefined ? staffOverride : bl.staffId;
+      if (!effectiveStaffId) return;
+      if (effectiveStaffId === bl.staffId) return; // same as permanent, no change
+      const newStaff = (S.staff || []).find(x => x.id === effectiveStaffId);
+      const origStaff = (S.staff || []).find(x => x.id === bl.staffId);
+      if (!newStaff) return;
+      const key = effectiveStaffId + '|' + c.id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        items.push({ icon: '🔄', color: '#185FA5', bg: '#E6F1FB', border: '#85B7EB',
+          text: '<strong>' + newStaff.name + '</strong> covering <strong>' + c.name + '</strong>',
+          sub: origStaff ? 'Usually: ' + origStaff.name : 'Not their regular client' });
+      }
+    });
+  });
+
+  // 5. Temp blocks
+  (S.tempBlocks || []).filter(tb => tb.day === today).forEach(tb => {
+    const c = (S.clients || []).find(x => x.id === tb.cid);
+    const s = (S.staff || []).find(x => x.id === tb.staffId);
+    items.push({ icon: '📌', color: '#185FA5', bg: '#E6F1FB', border: '#85B7EB',
+      text: '<strong>Temp block</strong>' + (tb.label ? ' – ' + tb.label : '') + (c ? ' for ' + c.name : ''),
+      sub: tb.from + '–' + tb.to + (s ? ' • ' + s.name : ' • Unassigned') });
+  });
+
+  if (items.length === 0) {
+    inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No changes from the regular schedule today.</div>';
+    box.style.display = 'block';
+    badge.style.display = 'none';
+    return;
+  }
+
+  inner.innerHTML = items.map(ci => {
+    const sub = ci.sub ? '<div style="font-size:0.75rem;color:' + ci.color + ';opacity:.75;margin-top:2px;">' + ci.sub + '</div>' : '';
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:10px;background:' + ci.bg + ';border:1px solid ' + ci.border + ';">'
+      + '<span style="font-size:1rem;flex-shrink:0;margin-top:1px;">' + ci.icon + '</span>'
+      + '<div style="flex:1;min-width:0;font-size:0.83rem;color:' + ci.color + ';">' + ci.text + sub + '</div>'
+      + '</div>';
+  }).join('');
+
+  box.style.display = 'block';
+  badge.textContent = items.length + (items.length === 1 ? ' change' : ' changes');
+  badge.style.display = 'inline';
 }
 
 async function fetchStaffFromSupabase() {
@@ -2077,8 +2207,10 @@ function init() {
   fetchWeeklySchedule();
   fetchCoverageFromSupabase();
   fetchRemindersFromSupabase();
+  fetchTodaysChanges();
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
   setInterval(fetchWeeklySchedule, 5 * 60 * 1000);
+  setInterval(fetchTodaysChanges, 60 * 1000); // refresh Today's Changes every minute
   // Refresh weekly schedule when user returns to this tab
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') fetchWeeklySchedule();
