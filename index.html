@@ -1065,6 +1065,9 @@ function renderToday() {
   });
 
   Object.values(grouped).forEach(g => {
+    // Sort sessions by start time (a.time may be a range like "9:00 AM–1:00 PM")
+    function startHour(t) { return parseHour((t||'').split(/[–\-]/)[0].trim()) || 0; }
+    g.sessions.sort(function(a, b) { return startHour(a.time) - startHour(b.time); });
     const div = document.createElement('div');
     div.className = 'assignment-card';
     const sessionsHTML = g.sessions.map(s => `
