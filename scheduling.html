@@ -169,6 +169,7 @@ input:focus,select:focus{outline:none;border-color:#7F77DD;}
     <div class="nav-tab" data-tab="callout" onclick="go('callout')">Callout</div>
     <div class="nav-tab" data-tab="data" onclick="go('data')">Edit Data</div>
     <div class="nav-tab" data-tab="save" onclick="go('save')">Save/Load</div>
+    <div class="nav-tab" data-tab="reports" onclick="go('reports')">📊 Reports</div>
     <div class="nav-tab" data-tab="ai" onclick="go('ai')">&#x1F916; AI Assistant</div>
     <div class="nav-right">
       <span class="push-status" id="push-status"></span>
@@ -382,7 +383,7 @@ const DD={
 function slotsInBlock(from,to){const lo=t2m(from),hi=t2m(to);if(lo===hi)return TIMES.filter(t=>t2m(t)===lo);return TIMES.filter(t=>t2m(t)>=lo&&t2m(t)<hi);}
 function initSDS(st){const sd={};st.forEach(s=>{sd[s.id]=new Set(Object.keys(s.availability).filter(d=>DAYS.includes(d)));});return sd;}
 
-let S={tab:'today',...JSON.parse(JSON.stringify(DD)),selClient:'c1',selStaff:'s1',calloutStaff:null,calloutClient:null,calledOut:[],calledOutClients:[],clientOverrides:{},clientOverrideCounts:{},staffOverrides:{},acknowledgedChanges:{},todayFilter:'all',calloutMode:'staff',edTab:'clients',expEdit:null,dirty:false,lastSaved:null,podView:'clients',selPodClient:null,selPodStaff:null,aiKey:'',aiMessages:[],aiLoading:false,selectedDay:null};
+let S={tab:'today',...JSON.parse(JSON.stringify(DD)),selClient:'c1',selStaff:'s1',calloutStaff:null,calloutClient:null,calledOut:[],calledOutClients:[],clientOverrides:{},clientOverrideCounts:{},staffOverrides:{},acknowledgedChanges:{},todayFilter:'all',calloutMode:'staff',edTab:'clients',expEdit:null,dirty:false,lastSaved:null,podView:'clients',selPodClient:null,selPodStaff:null,aiKey:'',aiMessages:[],aiLoading:false,selectedDay:null,eventLog:[],reportMonth:null};
 S.selDaysS=initSDS(S.staff);
 
 // clientOverrides: {cid: [{blockIdx, day, from, to, date}]} — today-only per-block TIME overrides
@@ -914,6 +915,7 @@ function applyState(p){
   S.clientOverrideCounts=p.clientOverrideCounts||{};
   S.staffOverrides=p.staffOverrides||{};
   S.acknowledgedChanges=p.acknowledgedChanges||{};
+  S.eventLog=p.eventLog||[];
   S.selClient=S.clients[0]?.id||null;
   S.selStaff=S.staff[0]?.id||null;
   S.lastSaved=p.savedAt||null;
@@ -953,7 +955,7 @@ async function tryLoad(){
 
 async function doSave(silent){
   try{
-    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},savedAt:new Date().toISOString()};
+    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],savedAt:new Date().toISOString()};
     // Save to localStorage immediately as fast cache
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
     // Save to Supabase
@@ -1486,11 +1488,23 @@ function mkCO(){
   }
   render();
 }
-function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});render();}
+function logEvent(type,subtype,id,name){
+  if(!S.eventLog)S.eventLog=[];
+  S.eventLog.push({date:new Date().toISOString().slice(0,10),type,subtype,id,name});
+  markDirty();
+}
+function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);logEvent('staff-callout','staff-initiated',sid,s?.name||sid);render();}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);render();}
-function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
-function mkClientCO2(cid){if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);const c=gcN(cid);const sub=_lastCancelSubtype||'client-initiated';delete _lastCancelSubtype;logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO2(cid){
+  const c=gcN(cid);
+  const sub=confirm('Who initiated this cancellation?\n\nOK = Client called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';
+  if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);
+  logEvent('client-cancel',sub,cid,c?.name||cid);
+  markDirty();render();showToast(`Client cancelled — sessions removed`,false);
+}
 function rmClientCO(cid){S.calledOutClients=S.calledOutClients.filter(c=>c!==cid);markDirty();render();showToast(`Client restored — sessions back on schedule`,false);}
+var _lastCancelSubtype;
 function renderTodayOverrideBlocks(){
   const cid=document.getElementById('tod-client-sel')?.value;
   const el=document.getElementById('tod-block-list');
@@ -1595,7 +1609,123 @@ async function sendAIMessage(){const inp=document.getElementById('ai-inp');if(!i
 function askSuggestion(text){const inp=document.getElementById('ai-inp');if(inp){inp.value=text;}sendAIMessage();}
 function rAI(){loadAIKey();const keySet=!!S.aiKey;const suggestions=['Who is overloaded this week?','Which clients have the weakest pod coverage?','Are there any scheduling conflicts I should know about?','Suggest how to balance the workload more evenly','Who can cover if someone calls out today?'];const msgsHtml=S.aiMessages.map(m=>{const cls=m.role==='error'?'error':m.role;return`<div class="ai-msg ${cls}">${m.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;}).join('');const typingHtml=S.aiLoading?`<div class="ai-msg assistant"><div class="ai-typing"><span></span><span></span><span></span></div></div>`:'';return`<div class="ai-wrap">${!keySet?`<div class="ai-key-wrap"><div style="font-size:13px;font-weight:500;margin-bottom:.5rem">Enter your Anthropic API key to enable AI</div><div style="font-size:11px;color:#666;margin-bottom:.75rem">Your key is stored only in this browser and only sent to Anthropic when you ask a question. Get a key at <strong>console.anthropic.com</strong>.</div><div style="display:flex;gap:8px"><input type="password" id="ai-key-inp" placeholder="sk-ant-..." style="flex:1;font-family:monospace;font-size:12px"><button class="btn btn-p" onclick="const k=document.getElementById('ai-key-inp').value.trim();if(k){S.aiKey=k;saveAIKey(k);render();}else{showToast('Paste your API key first',true);}">Save key</button></div></div>`:`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem"><div style="font-size:12px;color:#1D9E75;font-weight:500">&#x2713; API key set</div><div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="S.aiMessages=[];render()">Clear chat</button><button class="btn btn-sm btn-d" onclick="S.aiKey='';try{localStorage.removeItem('${AI_SK}');}catch(e){}render()">Remove key</button></div></div>`}${S.aiMessages.length===0&&keySet?`<div><div style="font-size:12px;font-weight:500;color:#888;margin-bottom:.5rem">Suggested questions</div><div class="ai-suggestions">${suggestions.map(s=>`<button class="ai-sug" onclick="askSuggestion('${s}')">${s}</button>`).join('')}</div></div>`:''}  <div class="ai-messages" id="ai-msgs" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.75rem;padding-bottom:.5rem">${S.aiMessages.length===0&&keySet?`<div class="ai-msg system">Ask me anything about your schedule. I can see all your clients, staff, pods, and current assignments.</div>`:''} ${msgsHtml}${typingHtml}</div>${keySet?`<div class="ai-input-row"><textarea id="ai-inp" placeholder="Ask about your schedule... e.g. &quot;Alex called out Monday \u2014 who can cover?&quot;" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage();}" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea><button class="ai-send" onclick="sendAIMessage()" ${S.aiLoading?'disabled':''}>Send</button></div>`:''}</div>`;}
 
-function render(){const mc=document.getElementById('mc');if(!mc)return;const block=['pods','data','save','ai'];mc.style.display=block.includes(S.tab)?'block':'flex';window._BM={};if(S.tab==='today'){mc.innerHTML=rToday();const mp=document.getElementById('changes-panel-mount');if(mp&&window._changesPanelHTML)mp.innerHTML=window._changesPanelHTML;}else if(S.tab==='week')mc.innerHTML=rWeek();else if(S.tab==='clients')mc.innerHTML=rClients();else if(S.tab==='staff')mc.innerHTML=rStaff();else if(S.tab==='pods')mc.innerHTML=rPods();else if(S.tab==='callout')mc.innerHTML=rCallout();else if(S.tab==='data')mc.innerHTML=rData();else if(S.tab==='save')mc.innerHTML=rSave();else if(S.tab==='ai')mc.innerHTML=rAI();updSI();}
+function rReports(){
+  const log=S.eventLog||[];
+  // Collect all unique year-months from log, plus current month
+  const now=new Date();
+  const curYM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const months=new Set([curYM]);
+  log.forEach(e=>{if(e.date)months.add(e.date.slice(0,7));});
+  const monthList=[...months].sort().reverse();
+  if(!S.reportMonth||!months.has(S.reportMonth))S.reportMonth=curYM;
+  const sel=S.reportMonth;
+  const entries=log.filter(e=>e.date&&e.date.startsWith(sel));
+
+  // Client cancellations
+  const clientMap={};
+  entries.filter(e=>e.type==='client-cancel').forEach(e=>{
+    if(!clientMap[e.id])clientMap[e.id]={name:e.name,clientInit:0,clinicInit:0,unknown:0};
+    if(e.subtype==='client-initiated')clientMap[e.id].clientInit++;
+    else if(e.subtype==='clinic-initiated')clientMap[e.id].clinicInit++;
+    else clientMap[e.id].unknown++;
+  });
+
+  // Staff callouts
+  const staffMap={};
+  entries.filter(e=>e.type==='staff-callout').forEach(e=>{
+    if(!staffMap[e.id])staffMap[e.id]={name:e.name,count:0};
+    staffMap[e.id].count++;
+  });
+
+  const fmtMonth=ym=>{const[y,m]=ym.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});};
+
+  const monthOpts=monthList.map(m=>`<option value="${m}"${m===sel?'selected':''}>${fmtMonth(m)}</option>`).join('');
+
+  const clientRows=Object.values(clientMap).sort((a,b)=>(b.clientInit+b.clinicInit+b.unknown)-(a.clientInit+a.clinicInit+a.unknown));
+  const staffRows=Object.values(staffMap).sort((a,b)=>b.count-a.count);
+
+  const clientTable=clientRows.length===0
+    ?'<div style="font-size:12px;color:#999;padding:12px 0;">No client cancellations logged this month.</div>'
+    :`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid #eee;">
+        <th style="text-align:left;padding:8px 10px;font-weight:600;color:#444;">Client</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#3C3489;">Client Called Out</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#993C1D;">Clinic Cancelled</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#888;">Total</th>
+      </tr></thead>
+      <tbody>${clientRows.map((r,i)=>`<tr style="border-bottom:1px solid #f0f0f0;background:${i%2?'#fafafa':'#fff'}">
+        <td style="padding:9px 10px;font-weight:600;">${r.name}</td>
+        <td style="text-align:center;padding:9px 10px;">
+          ${r.clientInit>0?`<span style="background:#EEEDFE;color:#3C3489;padding:2px 10px;border-radius:12px;font-weight:700;">${r.clientInit}</span>`:'<span style="color:#ccc;">0</span>'}
+        </td>
+        <td style="text-align:center;padding:9px 10px;">
+          ${r.clinicInit>0?`<span style="background:#FFF3F0;color:#993C1D;padding:2px 10px;border-radius:12px;font-weight:700;">${r.clinicInit}</span>`:'<span style="color:#ccc;">0</span>'}
+        </td>
+        <td style="text-align:center;padding:9px 10px;font-weight:700;color:#222;">${r.clientInit+r.clinicInit+r.unknown}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+
+  const staffTable=staffRows.length===0
+    ?'<div style="font-size:12px;color:#999;padding:12px 0;">No staff callouts logged this month.</div>'
+    :`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid #eee;">
+        <th style="text-align:left;padding:8px 10px;font-weight:600;color:#444;">Staff Member</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#993C1D;">Times Called Out</th>
+      </tr></thead>
+      <tbody>${staffRows.map((r,i)=>`<tr style="border-bottom:1px solid #f0f0f0;background:${i%2?'#fafafa':'#fff'}">
+        <td style="padding:9px 10px;font-weight:600;">${r.name}</td>
+        <td style="text-align:center;padding:9px 10px;">
+          <span style="background:#FFF3EE;color:#993C1D;padding:2px 10px;border-radius:12px;font-weight:700;">${r.count}</span>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+
+  // Summary counts
+  const totalClientCancel=entries.filter(e=>e.type==='client-cancel').length;
+  const totalStaffOut=entries.filter(e=>e.type==='staff-callout').length;
+
+  return`<div style="padding:1.5rem;max-width:860px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+      <div style="font-size:1.2rem;font-weight:700;color:#222;">📊 Monthly Reports</div>
+      <select onchange="S.reportMonth=this.value;render()" style="padding:6px 12px;border-radius:8px;border:1.5px solid #ddd;font-size:13px;cursor:pointer;">${monthOpts}</select>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem;">
+      <div style="background:#EEEDFE;border-radius:12px;padding:16px 20px;text-align:center;">
+        <div style="font-size:2rem;font-weight:800;color:#3C3489;">${totalClientCancel}</div>
+        <div style="font-size:12px;color:#534AB7;font-weight:600;margin-top:4px;">Client Cancellations</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;">${fmtMonth(sel)}</div>
+      </div>
+      <div style="background:#FFF3EE;border-radius:12px;padding:16px 20px;text-align:center;">
+        <div style="font-size:2rem;font-weight:800;color:#993C1D;">${totalStaffOut}</div>
+        <div style="font-size:12px;color:#C0532A;font-weight:600;margin-top:4px;">Staff Callouts</div>
+        <div style="font-size:11px;color:#999;margin-top:2px;">${fmtMonth(sel)}</div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1.5px solid #eee;border-radius:12px;padding:20px;margin-bottom:1.25rem;">
+      <div style="font-weight:700;font-size:14px;color:#222;margin-bottom:12px;">📵 Client Cancellations</div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px;">
+        <span style="background:#EEEDFE;color:#3C3489;padding:1px 8px;border-radius:8px;margin-right:6px;">Client Called Out</span> = client or family initiated &nbsp;
+        <span style="background:#FFF3F0;color:#993C1D;padding:1px 8px;border-radius:8px;">Clinic Cancelled</span> = we cancelled on them
+      </div>
+      ${clientTable}
+    </div>
+
+    <div style="background:#fff;border:1.5px solid #eee;border-radius:12px;padding:20px;margin-bottom:1.25rem;">
+      <div style="font-weight:700;font-size:14px;color:#222;margin-bottom:12px;">🤒 Staff Callouts</div>
+      ${staffTable}
+    </div>
+
+    ${log.length===0?'<div style="font-size:12px;color:#bbb;text-align:center;padding:1rem;">Events will appear here as you log callouts and cancellations going forward.</div>':''}
+
+    <div style="text-align:right;margin-top:8px;">
+      <button class="btn btn-sm" onclick="if(confirm('Clear ALL report history? This cannot be undone.')){S.eventLog=[];markDirty();render();showToast('Report history cleared',false);}">🗑 Clear History</button>
+    </div>
+  </div>`;
+}
+
+function render(){const mc=document.getElementById('mc');if(!mc)return;const block=['pods','data','save','ai','reports'];mc.style.display=block.includes(S.tab)?'block':'flex';window._BM={};if(S.tab==='today'){mc.innerHTML=rToday();const mp=document.getElementById('changes-panel-mount');if(mp&&window._changesPanelHTML)mp.innerHTML=window._changesPanelHTML;}else if(S.tab==='week')mc.innerHTML=rWeek();else if(S.tab==='clients')mc.innerHTML=rClients();else if(S.tab==='staff')mc.innerHTML=rStaff();else if(S.tab==='pods')mc.innerHTML=rPods();else if(S.tab==='callout')mc.innerHTML=rCallout();else if(S.tab==='data')mc.innerHTML=rData();else if(S.tab==='save')mc.innerHTML=rSave();else if(S.tab==='reports')mc.innerHTML=rReports();else if(S.tab==='ai')mc.innerHTML=rAI();updSI();}
 
 tryLoad(); // async — loads from localStorage instantly, then syncs from cloud
 </script>
