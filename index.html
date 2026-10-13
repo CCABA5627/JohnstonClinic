@@ -30,7 +30,8 @@
     --shadow-hover: 0 6px 24px rgba(74,144,217,0.18);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--text); display: flex; min-height: 100vh; }
+  body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--text); display: flex; min-height: 100vh; min-height: -webkit-fill-available; }
+  html { background: #1a2535; /* same as login bg — prevents bleed-through on iOS */ }
 
   /* SIDEBAR */
   .sidebar {
@@ -435,7 +436,7 @@
   }
 
   /* ===== STAFF LOGIN ===== */
-  #staff-login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:linear-gradient(135deg,#1a2535 0%,#3D5A73 100%); position:fixed; inset:0; z-index:9999; }
+  #staff-login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; min-height:-webkit-fill-available; background:linear-gradient(135deg,#1a2535 0%,#3D5A73 100%); position:fixed; inset:0; z-index:9999; padding-bottom:env(safe-area-inset-bottom,0px); }
   .staff-login-box { background:#fff; border-radius:20px; padding:40px 36px; width:360px; box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center; }
   .staff-login-box h2 { font-family:'Nunito',sans-serif; font-weight:900; font-size:1.5rem; color:var(--blue-dark); margin-bottom:4px; }
   .staff-login-box p { color:var(--muted); font-size:0.82rem; margin-bottom:24px; }
@@ -920,19 +921,21 @@ async function fetchAssignmentsFromSupabase() {
 
 async function fetchStaffFromSupabase() {
   try {
-    // Try staff_profiles first (full profiles pushed from admin)
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles?order=name.asc`, {
+    // Try schedule_state with id='staff_profiles' (pushed from admin, no extra table needed)
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule_state?id=eq.staff_profiles`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      // staff_profiles has full data — use it directly, merged with local PIN accounts
-      staffList = data.map(r => ({
-        name: r.name,
-        role: r.role || 'RBT',
-        facts: r.facts || { hometown:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
-      }));
-      saveData('cc_staff', staffList);
+    const rows = await res.json();
+    if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+      const profiles = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+      if (Array.isArray(profiles) && profiles.length > 0) {
+        staffList = profiles.map(r => ({
+          name: r.name,
+          role: r.role || 'RBT',
+          facts: r.facts || { hometown:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
+        }));
+        saveData('cc_staff', staffList);
+      }
     } else {
       // Fallback: staff_names (only names, from scheduling site push)
       const res2 = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {

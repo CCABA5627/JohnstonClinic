@@ -1357,14 +1357,16 @@ function editRBT(i) {
 }
 async function pushStaffProfilesToSupabase() {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles?name=neq.null`, {
-      method: 'DELETE', headers: SB_HEADERS
+    const payload = { id: 'staff_profiles', data: JSON.stringify(staffList), updated_at: new Date().toISOString() };
+    // Try upsert into schedule_state (always exists)
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule_state`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload)
     });
-    if (staffList.length > 0) {
-      await fetch(`${SUPABASE_URL}/rest/v1/staff_profiles`, {
-        method: 'POST', headers: SB_HEADERS,
-        body: JSON.stringify(staffList.map(s => ({ name: s.name, role: s.role || 'RBT', facts: s.facts || {} })))
-      });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('Staff sync failed:', err);
     }
   } catch(e) { console.warn('Staff profile sync failed:', e); }
 }
