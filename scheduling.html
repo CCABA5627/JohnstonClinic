@@ -964,7 +964,13 @@ async function tryLoad(){
 
 async function doSave(silent){
   try{
-    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],savedAt:new Date().toISOString()};
+    // Build a plain-text portal summary from the computed changeItems (set by rToday)
+    const stripHTML=s=>s.replace(/<[^>]*>/g,'');
+    const portalChanges=(window._changeItemsData||[]).map(ci=>({
+      icon:ci.icon,text:stripHTML(ci.text),sub:ci.sub?stripHTML(ci.sub):'',
+      color:ci.color,bg:ci.bg,border:ci.border
+    }));
+    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,savedAt:new Date().toISOString()};
     // Save to localStorage immediately as fast cache
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
     // Save to Supabase

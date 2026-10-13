@@ -951,94 +951,19 @@ async function fetchTodaysChanges() {
   }
 }
 
-function renderTodaysChangesBox(S) {
+function renderTodaysChangesBox(data) {
   const box = document.getElementById('todays-changes-box');
   const inner = document.getElementById('todays-changes-inner');
   const badge = document.getElementById('changes-badge');
   if (!box || !inner) return;
 
-  // Figure out today's day name (Mon, Tue, etc.)
-  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const today = DAYS[new Date().getDay()];
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Use pre-computed portalChanges written by the scheduling site on every save
+  const items = data.portalChanges || [];
 
-  const items = [];
-
-  // 1. Staff callouts
-  const calledOut = S.calledOut || [];
-  calledOut.forEach(co => {
-    const s = (S.staff || []).find(x => x.id === co.sid);
-    if (!s) return;
-    let label = 'All day';
-    if (co.fromM !== undefined && co.toM !== undefined) {
-      const fmt = m => { const h=Math.floor(m/60); const mn=m%60; const ampm=h<12?'AM':'PM'; return (h%12||12)+(mn?':'+String(mn).padStart(2,'0'):'') +' '+ampm; };
-      label = fmt(co.fromM) + '–' + fmt(co.toM);
-    }
-    items.push({ icon: '🚨', color: '#993C1D', bg: '#FFF3EE', border: '#F0997B',
-      text: '<strong>' + s.name + '</strong> called out', sub: label });
-  });
-
-  // 2. Client cancellations
-  const calledOutClients = S.calledOutClients || [];
-  calledOutClients.forEach(cid => {
-    const c = (S.clients || []).find(x => x.id === cid);
-    if (!c) return;
-    items.push({ icon: '📵', color: '#3C3489', bg: '#F0F0FE', border: '#AFA9EC',
-      text: '<strong>' + c.name + '</strong> cancelled today' });
-  });
-
-  // 3. Today-only time overrides
-  const clientOverrides = S.clientOverrides || {};
-  Object.entries(clientOverrides).forEach(([cid, ovList]) => {
-    if (!Array.isArray(ovList)) return;
-    const todayOvs = ovList.filter(o => o.date === todayISO || (o.day === today && !o.date));
-    if (!todayOvs.length) return;
-    const c = (S.clients || []).find(x => x.id === cid);
-    if (!c) return;
-    todayOvs.forEach(ov => {
-      items.push({ icon: '📅', color: '#b87a00', bg: '#FFF8EC', border: '#EF9F27',
-        text: '<strong>' + c.name + '</strong> time adjusted today',
-        sub: 'Block ' + (ov.blockIdx + 1) + ': ' + ov.from + '–' + ov.to });
-    });
-  });
-
-  // 4. Staff covering non-regular clients
-  const seen = new Set();
-  (S.clients || []).forEach(c => {
-    const dayBlocks = (c.schedule && c.schedule[today]) || [];
-    dayBlocks.forEach((bl, bi) => {
-      if (!bl.staffId) return;
-      // Check if a staff override is in effect for today
-      const todayOverrideKey = c.id + '_' + today + '_' + bi;
-      const staffOverride = (S.staffOverrides || {})[todayOverrideKey];
-      const effectiveStaffId = staffOverride !== undefined ? staffOverride : bl.staffId;
-      if (!effectiveStaffId) return;
-      if (effectiveStaffId === bl.staffId) return; // same as permanent, no change
-      const newStaff = (S.staff || []).find(x => x.id === effectiveStaffId);
-      const origStaff = (S.staff || []).find(x => x.id === bl.staffId);
-      if (!newStaff) return;
-      const key = effectiveStaffId + '|' + c.id;
-      if (!seen.has(key)) {
-        seen.add(key);
-        items.push({ icon: '🔄', color: '#185FA5', bg: '#E6F1FB', border: '#85B7EB',
-          text: '<strong>' + newStaff.name + '</strong> covering <strong>' + c.name + '</strong>',
-          sub: origStaff ? 'Usually: ' + origStaff.name : 'Not their regular client' });
-      }
-    });
-  });
-
-  // 5. Temp blocks
-  (S.tempBlocks || []).filter(tb => tb.day === today).forEach(tb => {
-    const c = (S.clients || []).find(x => x.id === tb.cid);
-    const s = (S.staff || []).find(x => x.id === tb.staffId);
-    items.push({ icon: '📌', color: '#185FA5', bg: '#E6F1FB', border: '#85B7EB',
-      text: '<strong>Temp block</strong>' + (tb.label ? ' – ' + tb.label : '') + (c ? ' for ' + c.name : ''),
-      sub: tb.from + '–' + tb.to + (s ? ' • ' + s.name : ' • Unassigned') });
-  });
+  box.style.display = 'block';
 
   if (items.length === 0) {
     inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No changes from the regular schedule today.</div>';
-    box.style.display = 'block';
     badge.style.display = 'none';
     return;
   }
@@ -1047,11 +972,10 @@ function renderTodaysChangesBox(S) {
     const sub = ci.sub ? '<div style="font-size:0.75rem;color:' + ci.color + ';opacity:.75;margin-top:2px;">' + ci.sub + '</div>' : '';
     return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:10px;background:' + ci.bg + ';border:1px solid ' + ci.border + ';">'
       + '<span style="font-size:1rem;flex-shrink:0;margin-top:1px;">' + ci.icon + '</span>'
-      + '<div style="flex:1;min-width:0;font-size:0.83rem;color:' + ci.color + ';">' + ci.text + sub + '</div>'
+      + '<div style="flex:1;min-width:0;font-size:0.83rem;color:' + ci.color + ';font-weight:500;">' + ci.text + sub + '</div>'
       + '</div>';
   }).join('');
 
-  box.style.display = 'block';
   badge.textContent = items.length + (items.length === 1 ? ' change' : ' changes');
   badge.style.display = 'inline';
 }
