@@ -1467,6 +1467,7 @@ function clkST(sid,day,time){const s=gsN(sid);if(!s)return;if(!s.availability[da
 function saSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[...TIMES];markDirty();render();}
 function clrSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[];markDirty();render();}
 function rnS(id,val){if(val.trim()){const s=gsN(id);if(s)s.name=val.trim();markDirty();render();}}
+function askStaffCalloutSubtype(name){return confirm('Who initiated this callout for '+name+'?\n\nOK = Staff called out themselves\nCancel = Clinic sent them home / removed them')?'staff-initiated':'clinic-initiated';}
 function mkCO(){
   const sel=document.getElementById('co-sel');if(!sel?.value)return;
   const sid=sel.value;
@@ -1474,13 +1475,14 @@ function mkCO(){
   const fromV=fromEl?.value;const toV=toEl?.value;
   S.calledOut=S.calledOut.filter(co=>co.sid!==sid);
   const s=gsN(sid);
+  const sub=askStaffCalloutSubtype(s?.name||sid);
   if(fromV&&toV&&t2m(fromV)<t2m(toV)){
     S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV)});
-    logEvent('staff-callout','staff-initiated',sid,s?.name||sid);
+    logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} out ${fromV} \u2013 ${toV}`,false);
   } else {
     S.calledOut.push({sid});
-    logEvent('staff-callout','staff-initiated',sid,s?.name||sid);
+    logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} marked out all day`,false);
   }
   render();
@@ -1490,7 +1492,7 @@ function logEvent(type,subtype,id,name){
   S.eventLog.push({date:new Date().toISOString().slice(0,10),type,subtype,id,name});
   markDirty();
 }
-function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);logEvent('staff-callout','staff-initiated',sid,s?.name||sid);render();}
+function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);render();}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);render();}
 function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
 function mkClientCO2(cid){
@@ -1630,8 +1632,10 @@ function rReports(){
   // Staff callouts
   const staffMap={};
   entries.filter(e=>e.type==='staff-callout').forEach(e=>{
-    if(!staffMap[e.id])staffMap[e.id]={name:e.name,count:0};
-    staffMap[e.id].count++;
+    if(!staffMap[e.id])staffMap[e.id]={name:e.name,staffInit:0,clinicInit:0,unknown:0};
+    if(e.subtype==='staff-initiated')staffMap[e.id].staffInit++;
+    else if(e.subtype==='clinic-initiated')staffMap[e.id].clinicInit++;
+    else staffMap[e.id].unknown++;
   });
 
   const fmtMonth=ym=>{const[y,m]=ym.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});};
@@ -1639,7 +1643,7 @@ function rReports(){
   const monthOpts=monthList.map(m=>`<option value="${m}"${m===sel?'selected':''}>${fmtMonth(m)}</option>`).join('');
 
   const clientRows=Object.values(clientMap).sort((a,b)=>(b.clientInit+b.clinicInit+b.unknown)-(a.clientInit+a.clinicInit+a.unknown));
-  const staffRows=Object.values(staffMap).sort((a,b)=>b.count-a.count);
+  const staffRows=Object.values(staffMap).sort((a,b)=>(b.staffInit+b.clinicInit+b.unknown)-(a.staffInit+a.clinicInit+a.unknown));
 
   const clientTable=clientRows.length===0
     ?'<div style="font-size:12px;color:#999;padding:12px 0;">No client cancellations logged this month.</div>'
@@ -1664,22 +1668,49 @@ function rReports(){
 
   const staffTable=staffRows.length===0
     ?'<div style="font-size:12px;color:#999;padding:12px 0;">No staff callouts logged this month.</div>'
-    :`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    :`<div style="font-size:11px;color:#888;margin-bottom:10px;">
+        <span style="background:#FFF3EE;color:#993C1D;padding:1px 8px;border-radius:8px;margin-right:6px;">Staff Called Out</span> = they initiated &nbsp;
+        <span style="background:#FFF3F0;color:#993C1D;padding:1px 8px;border-radius:8px;border:1px dashed #f0a090;">Clinic Removed</span> = we sent them home
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="border-bottom:2px solid #eee;">
         <th style="text-align:left;padding:8px 10px;font-weight:600;color:#444;">Staff Member</th>
-        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#993C1D;">Times Called Out</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#993C1D;">Staff Called Out</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#b87a00;">Clinic Removed</th>
+        <th style="text-align:center;padding:8px 10px;font-weight:600;color:#888;">Total</th>
       </tr></thead>
       <tbody>${staffRows.map((r,i)=>`<tr style="border-bottom:1px solid #f0f0f0;background:${i%2?'#fafafa':'#fff'}">
         <td style="padding:9px 10px;font-weight:600;">${r.name}</td>
         <td style="text-align:center;padding:9px 10px;">
-          <span style="background:#FFF3EE;color:#993C1D;padding:2px 10px;border-radius:12px;font-weight:700;">${r.count}</span>
+          ${r.staffInit>0?`<span style="background:#FFF3EE;color:#993C1D;padding:2px 10px;border-radius:12px;font-weight:700;">${r.staffInit}</span>`:'<span style="color:#ccc;">0</span>'}
         </td>
+        <td style="text-align:center;padding:9px 10px;">
+          ${r.clinicInit>0?`<span style="background:#FFF8EC;color:#b87a00;padding:2px 10px;border-radius:12px;font-weight:700;">${r.clinicInit}</span>`:'<span style="color:#ccc;">0</span>'}
+        </td>
+        <td style="text-align:center;padding:9px 10px;font-weight:700;color:#222;">${r.staffInit+r.clinicInit+r.unknown}</td>
       </tr>`).join('')}</tbody>
     </table>`;
 
   // Summary counts
   const totalClientCancel=entries.filter(e=>e.type==='client-cancel').length;
   const totalStaffOut=entries.filter(e=>e.type==='staff-callout').length;
+
+  // Raw log for this month (with delete per entry)
+  const allIdxInMonth=(S.eventLog||[]).map((e,i)=>({e,i})).filter(({e})=>e.date&&e.date.startsWith(sel));
+  const rawLog=allIdxInMonth.length===0?'':`<div style="background:#fff;border:1.5px solid #eee;border-radius:12px;padding:20px;margin-bottom:1.25rem;">
+    <div style="font-weight:700;font-size:14px;color:#222;margin-bottom:4px;">🗒 Individual Entries <span style="font-size:11px;font-weight:400;color:#999;">(click × to remove a duplicate or mistake)</span></div>
+    <div style="margin-top:10px;">${allIdxInMonth.map(({e,i})=>{
+      const icon=e.type==='staff-callout'?'🤒':'📵';
+      const typeLabel=e.type==='staff-callout'?'Staff callout':'Client cancel';
+      const subtypeLabel=e.subtype==='staff-initiated'?'staff initiated':e.subtype==='clinic-initiated'?'clinic initiated':e.subtype==='client-initiated'?'client initiated':e.subtype||'';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:12px;">
+        <span>${icon}</span>
+        <span style="flex:1;"><strong>${e.name||e.id}</strong> — ${typeLabel}${subtypeLabel?` <span style="color:#888;">(${subtypeLabel})</span>`:''}</span>
+        <span style="color:#aaa;">${e.date}</span>
+        <span onclick="S.eventLog.splice(${i},1);markDirty();render();" style="cursor:pointer;color:#ccc;font-weight:700;font-size:14px;padding:0 4px;" title="Remove this entry">×</span>
+      </div>`;
+    }).join('')}</div>
+  </div>`;
 
   return`<div style="padding:1.5rem;max-width:860px;margin:0 auto;">
     <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
@@ -1714,10 +1745,11 @@ function rReports(){
       ${staffTable}
     </div>
 
+    ${rawLog}
     ${log.length===0?'<div style="font-size:12px;color:#bbb;text-align:center;padding:1rem;">Events will appear here as you log callouts and cancellations going forward.</div>':''}
 
     <div style="text-align:right;margin-top:8px;">
-      <button class="btn btn-sm" onclick="if(confirm('Clear ALL report history? This cannot be undone.')){S.eventLog=[];markDirty();render();showToast('Report history cleared',false);}">🗑 Clear History</button>
+      <button class="btn btn-sm" onclick="if(confirm('Clear ALL report history? This cannot be undone.')){S.eventLog=[];markDirty();render();showToast('Report history cleared',false);}">🗑 Clear All History</button>
     </div>
   </div>`;
 }
