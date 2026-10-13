@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Circle City ABA — Staff Portal</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1E3A5F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Staff Portal">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Hide Netlify badge */
@@ -538,6 +544,13 @@
         <p>Today's staff–client assignments at a glance</p>
       </div>
       <div class="date-badge" id="today-date"></div>
+    </div>
+    <!-- PUSH NOTIFICATION BANNER -->
+    <div id="push-banner" style="display:none;background:#EBF5FF;border:1px solid #B3D4F5;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-size:1.2rem;">🔔</span>
+      <span style="font-size:0.85rem;color:#1E3A5F;flex:1;">Get notified when the schedule changes — even when this app is closed.</span>
+      <button id="push-enable-btn" onclick="enablePushNotifications()" style="background:#1E3A5F;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Enable Notifications</button>
+      <button onclick="document.getElementById('push-banner').style.display='none';localStorage.setItem('push-dismissed','1')" style="background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer;padding:0 4px;">✕</button>
     </div>
     <!-- TODAY'S CHANGES BOX (pulled from scheduling site) -->
     <div id="todays-changes-box" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
@@ -2183,6 +2196,136 @@ function init() {
   }
 }
 init();
+
+// ===================== PWA + PUSH NOTIFICATIONS =====================
+
+// VAPID public key — replace this with YOUR generated key after running setup
+const VAPID_PUBLIC_KEY = 'REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    console.log('[SW] Registered:', reg.scope);
+    return reg;
+  } catch (e) {
+    console.warn('[SW] Registration failed:', e);
+    return null;
+  }
+}
+
+async function saveSubscriptionToSupabase(sub) {
+  const json = sub.toJSON();
+  const payload = {
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+    created_at: new Date().toISOString(),
+  };
+  await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function enablePushNotifications() {
+  const btn = document.getElementById('push-enable-btn');
+  if (btn) { btn.textContent = 'Enabling…'; btn.disabled = true; }
+  try {
+    // Request permission
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      if (btn) { btn.textContent = 'Permission denied'; }
+      return;
+    }
+
+    // Get or register SW
+    let reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    if (!reg) reg = await registerServiceWorker();
+    if (!reg) throw new Error('Service worker unavailable');
+
+    // Subscribe to push
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    await saveSubscriptionToSupabase(sub);
+    localStorage.setItem('push-enabled', '1');
+
+    // Hide banner, show confirmation
+    document.getElementById('push-banner').style.display = 'none';
+    showPortalToast('🔔 Notifications enabled!');
+  } catch (e) {
+    console.error('[Push] Subscribe failed:', e);
+    if (btn) { btn.textContent = 'Enable Notifications'; btn.disabled = false; }
+    showPortalToast('Could not enable notifications — try again', true);
+  }
+}
+
+function showPortalToast(msg, err = false) {
+  let t = document.getElementById('portal-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'portal-toast';
+    t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;color:#fff;z-index:99999;display:none;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);white-space:nowrap;font-family:inherit;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = err ? '#D85A30' : '#1D9E75';
+  t.style.display = 'block';
+  clearTimeout(t._to);
+  t._to = setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+async function initPWA() {
+  // Register SW in background
+  registerServiceWorker();
+
+  // Show push banner if not already enabled/dismissed and browser supports it
+  if (!('Notification' in window) || !('PushManager' in window)) return;
+  if (localStorage.getItem('push-enabled') === '1') return;
+  if (localStorage.getItem('push-dismissed') === '1') return;
+  if (Notification.permission === 'granted') {
+    // Already granted — just re-subscribe silently
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (!existing) {
+      try {
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+        await saveSubscriptionToSupabase(sub);
+        localStorage.setItem('push-enabled', '1');
+      } catch (e) { /* VAPID key not set yet */ }
+    } else {
+      localStorage.setItem('push-enabled', '1');
+    }
+    return;
+  }
+  if (Notification.permission === 'denied') return;
+  // Show banner after a short delay so page loads first
+  setTimeout(() => {
+    const banner = document.getElementById('push-banner');
+    if (banner) banner.style.display = 'flex';
+  }, 1500);
+}
+
+initPWA();
 </script>
 </body>
 </html>

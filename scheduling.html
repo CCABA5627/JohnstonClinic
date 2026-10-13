@@ -238,6 +238,22 @@ input:focus,select:focus{outline:none;border-color:#7F77DD;}
 const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
 
+// Send push notification to all subscribed staff via Edge Function
+async function sendStaffPushNotification({title, body, tag} = {}) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/notify-staff`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ title, body, tag }),
+    });
+  } catch (e) {
+    console.warn('[Push] notify-staff call failed (non-fatal):', e.message);
+  }
+}
+
 async function pushToPortal() {
   const btn = document.getElementById('push-btn');
   const status = document.getElementById('push-status');
@@ -295,6 +311,13 @@ async function pushToPortal() {
 
     // Save portalChanges to schedule_state so staff portal shows current changes
     await doSave(true);
+
+    // Send push notifications to all subscribed staff
+    await sendStaffPushNotification({
+      title: 'Johnston Clinic \u2014 Schedule Updated',
+      body: rows.length + ' assignment' + (rows.length !== 1 ? 's' : '') + ' pushed at ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+      tag: 'schedule-push',
+    });
 
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     status.textContent = '\u2713 Pushed ' + rows.length + ' assignments at ' + time;
