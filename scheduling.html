@@ -189,6 +189,40 @@ input:focus,select:focus{outline:none;border-color:#7F77DD;}
 </style>
 </head>
 <body>
+<!-- PASSWORD GATE -->
+<div id="pw-gate" style="display:none;position:fixed;inset:0;z-index:99999;background:#1E3A5F;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:36px 32px;width:90%;max-width:360px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+    <div style="font-size:2rem;margin-bottom:8px;">🔒</div>
+    <h2 style="margin:0 0 6px;color:#1E3A5F;font-size:1.2rem;">CCABA Scheduling</h2>
+    <p style="color:#666;font-size:0.85rem;margin:0 0 20px;">Enter password to continue</p>
+    <input id="pw-input" type="password" placeholder="Password" autofocus
+      style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:1rem;margin-bottom:12px;outline:none;font-family:inherit;"
+      onkeydown="if(event.key==='Enter')checkPW()">
+    <div id="pw-error" style="color:#c0392b;font-size:0.82rem;margin-bottom:10px;display:none;">Incorrect password. Try again.</div>
+    <button onclick="checkPW()" style="width:100%;background:#1E3A5F;color:#fff;border:none;border-radius:10px;padding:13px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;">Unlock</button>
+  </div>
+</div>
+<script>
+(function(){
+  const HASH = '7c4a8d09ca3762af61e59520943dc26806b5d3a8b6c2e4e5a1b9f2d3e7f8a9b'; // placeholder replaced below
+  // Simple obfuscated check — not cryptographic, just keeps casual visitors out
+  function checkPW(){
+    const val = document.getElementById('pw-input').value;
+    if(val === atob('Q0NBQkFKb2huc3Rvbg==')) {
+      sessionStorage.setItem('sched-auth','1');
+      document.getElementById('pw-gate').style.display='none';
+    } else {
+      document.getElementById('pw-error').style.display='block';
+      document.getElementById('pw-input').value='';
+      document.getElementById('pw-input').focus();
+    }
+  }
+  window.checkPW = checkPW;
+  if(sessionStorage.getItem('sched-auth')==='1'){
+    document.getElementById('pw-gate').style.display='none';
+  }
+})();
+</script>
 <div class="app">
   <div class="nav">
     <span class="nav-brand">CCABA Scheduling</span>
