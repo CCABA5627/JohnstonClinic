@@ -1019,6 +1019,87 @@ async function tryLoad(){
   return true;
 }
 
+// Returns ISO date string for a given day-of-week in the current scheduling week (Mon-Fri)
+// The scheduling week runs Mon-Fri. Saturday/Sunday belong to the NEXT week.
+function isoForDay(dayName){
+  const dayIdx={Mon:1,Tue:2,Wed:3,Thu:4,Fri:5};
+  const target=dayIdx[dayName];
+  if(target===undefined)return null;
+  const now=new Date();
+  const dow=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  // If today is Sat(6) or Sun(0), we're planning the NEXT week
+  const weekOffset=(dow===0||dow===6)?1:0;
+  // Find Monday of the target week
+  const monday=new Date(now);
+  const daysToMon=((dow===0?7:dow)-1)+(weekOffset*7);
+  monday.setDate(now.getDate()-daysToMon+(weekOffset===1?7:0));
+  // Actually simpler: find this week's Monday
+  const thisMonday=new Date(now);
+  const d=now.getDay();
+  thisMonday.setDate(now.getDate()-(d===0?6:d-1)+(weekOffset*7));
+  thisMonday.setHours(0,0,0,0);
+  const result=new Date(thisMonday);
+  result.setDate(thisMonday.getDate()+(target-1));
+  return result.toISOString().slice(0,10);
+}
+
+function computeWeeklyChanges(){
+  // Compute changes for each day Mon-Fri for the current/upcoming week
+  // Returns { "2026-10-13": [...items], "2026-10-14": [...items], ... }
+  const result={};
+  DAYS.forEach(day=>{
+    const iso=isoForDay(day);
+    if(!iso){result[day]={iso:null,items:[]};return;}
+    const items=[];
+    const ovList2=S.clientOverrides||{};
+    const stOvList2=S.staffOverrides||{};
+
+    // 1. Staff callouts for this day
+    S.calledOut.forEach(co=>{
+      const s=gsN(co.sid);if(!s)return;
+      // callout applies if it has no date (recurring) or matches this iso
+      const applies=!co.date||co.date===iso;
+      if(applies)items.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:s.name+' called out',sub:coLabel(co)});
+    });
+    // 2. Client cancellations (today only — calledOutClients is always today)
+    if(iso===todayISO()){
+      S.calledOutClients.forEach(cid=>{const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled',sub:''});});
+    }
+    // 3. Time overrides for this day
+    Object.entries(ovList2).forEach(([cid,ovList])=>{
+      if(!Array.isArray(ovList))return;
+      const dayOvs=ovList.filter(o=>o.date===iso||(o.day===day&&!o.date));
+      if(!dayOvs.length)return;
+      const c=gcN(cid);if(!c)return;
+      const permBlocks=c.schedule[day]||[];
+      dayOvs.forEach(ov=>{const orig=permBlocks[ov.blockIdx];const origTime=orig?orig.from+'-'+orig.to:'?';items.push({icon:'📅',color:'#b87a00',bg:'#FFF8EC',border:'#EF9F27',text:c.name+' time changed',sub:'Block '+(ov.blockIdx+1)+': was '+origTime+' → now '+ov.from+'-'+ov.to});});
+    });
+    // 4. Staff overrides / coverage substitutions for this day
+    const seenSubs=new Set();
+    getDayBlocks(day).forEach(bl=>{
+      if(!bl.staffId||bl.isTemp)return;
+      const c=gcN(bl.client.id);if(!c)return;
+      const sub=gsN(bl.staffId);if(!sub)return;
+      const permBlocks=c.schedule[day]||[];
+      const permBlock=permBlocks[bl.blockIdx];
+      const permStaffId=permBlock?.staffId||null;
+      const isPermanentForClient=permBlocks.some(pb=>pb.staffId===bl.staffId);
+      const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
+      const hasNoPermanentRole=!isPermanentForClient;
+      const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
+      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+        const key=bl.staffId+'|'+bl.client.id;
+        if(!seenSubs.has(key)){seenSubs.add(key);const permName=permStaffId?gsN(permStaffId)?.name:null;items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:sub.name+' covering '+c.name,sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'-'+bl.to});}
+      }
+    });
+    // 5. Temp blocks for this day
+    (S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);const s=gsN(tb.staffId);items.push({icon:'📌',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:'Temp block'+(tb.label?' – '+tb.label:'')+(c?' for '+c.name:''),sub:tb.from+'-'+tb.to+(s?' • '+s.name:'')+(tb.staffId?'':' • Unassigned')});});
+
+    result[day]={iso,items};
+  });
+  return result;
+}
+
 function computePortalChanges(){
   // Compute Today's Changes without touching the DOM — for saving to portalChanges
   const today=todayDay();
@@ -1070,7 +1151,8 @@ async function doSave(silent){
       icon:ci.icon,text:ci.text,sub:ci.sub||'',
       color:ci.color,bg:ci.bg,border:ci.border
     }));
-    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,savedAt:new Date().toISOString()};
+    const weeklyChanges=computeWeeklyChanges();
+    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,weeklyChanges:weeklyChanges,savedAt:new Date().toISOString()};
     // Save to localStorage immediately as fast cache
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
     // Save to Supabase

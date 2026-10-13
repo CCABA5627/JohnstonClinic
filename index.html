@@ -592,7 +592,23 @@
       </div>
       <div class="date-badge" id="timeline-date"></div>
     </div>
-    <div class="sync-banner" style="margin-bottom:20px;">
+    <!-- WEEK'S UPDATES BOX -->
+    <div id="weekly-changes-box" style="background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:0.95rem;font-weight:700;color:var(--navy);">📋 This Week's Updates</h3>
+        <span id="weekly-changes-badge" style="display:none;background:#1E3A5F;color:#fff;font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:20px;"></span>
+      </div>
+      <div id="weekly-changes-inner" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:0.82rem;color:var(--muted);">Loading updates…</div>
+      </div>
+    </div>
+
+    <div class="card" id="weekly-schedule-card">
+      <div id="weekly-schedule-body" style="font-size:0.88rem;color:var(--muted);padding:20px 0;text-align:center;">Loading weekly schedule...</div>
+    </div>
+
+    <!-- Sync banner moved to bottom -->
+    <div class="sync-banner" style="margin-top:20px;">
       <div>
         <h4>🔗 Live from CCABA Scheduling</h4>
         <p>Reflects the current weekly view. Last synced: <span id="weekly-sync-time">—</span></p>
@@ -601,9 +617,6 @@
         <button onclick="fetchWeeklySchedule()" style="font-size:0.75rem;padding:5px 12px;border-radius:20px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;">↻ Refresh</button>
         <div class="sync-pill" id="weekly-sync-status">Loading...</div>
       </div>
-    </div>
-    <div class="card" id="weekly-schedule-card">
-      <div id="weekly-schedule-body" style="font-size:0.88rem;color:var(--muted);padding:20px 0;text-align:center;">Loading weekly schedule...</div>
     </div>
   </section>
 
@@ -965,11 +978,68 @@ async function fetchTodaysChanges() {
     const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     console.log('[fetchTodaysChanges] portalChanges:', raw.portalChanges);
     renderTodaysChangesBox(raw);
+    renderWeeklyChangesBox(raw);
   } catch(e) {
     console.error('[fetchTodaysChanges] error:', e);
     if (box) box.style.display = 'block';
     if (inner) inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">Could not load changes.</div>';
   }
+}
+
+function renderWeeklyChangesBox(data) {
+  const inner = document.getElementById('weekly-changes-inner');
+  const badge = document.getElementById('weekly-changes-badge');
+  if (!inner) return;
+
+  const weeklyChanges = data.weeklyChanges || {};
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri'];
+  const DAY_LABELS = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
+
+  // Collect days that have changes and are today or in the future
+  const sections = [];
+  DAY_NAMES.forEach(day => {
+    const entry = weeklyChanges[day];
+    if (!entry || !entry.iso || !entry.items || entry.items.length === 0) return;
+    const entryDate = new Date(entry.iso + 'T00:00:00');
+    if (entryDate < today) return; // past days — skip
+    sections.push({ day, iso: entry.iso, items: entry.items, date: entryDate });
+  });
+
+  if (sections.length === 0) {
+    inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No schedule changes this week.</div>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  const totalChanges = sections.reduce((sum, s) => sum + s.items.length, 0);
+  if (badge) { badge.textContent = totalChanges + (totalChanges === 1 ? ' change' : ' changes'); badge.style.display = 'inline'; }
+
+  const isToday = (d) => { const t = new Date(d + 'T00:00:00'); return t.getTime() === today.getTime(); };
+  const isTomorrow = (d) => { const t = new Date(d + 'T00:00:00'); const tom = new Date(today); tom.setDate(today.getDate()+1); return t.getTime() === tom.getTime(); };
+
+  inner.innerHTML = sections.map(s => {
+    const label = isToday(s.iso) ? 'Today' : isTomorrow(s.iso) ? 'Tomorrow' : DAY_LABELS[s.day];
+    const dateStr = new Date(s.iso + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+    const isCurrentDay = isToday(s.iso);
+    return '<div style="border-radius:10px;overflow:hidden;border:1px solid #e8e8e8;">'
+      + '<div style="padding:8px 12px;background:' + (isCurrentDay ? '#1E3A5F' : '#f4f6f9') + ';display:flex;align-items:center;gap:8px;">'
+      + '<span style="font-size:0.82rem;font-weight:700;color:' + (isCurrentDay ? '#fff' : 'var(--navy)') + ';">' + label + '</span>'
+      + '<span style="font-size:0.75rem;color:' + (isCurrentDay ? 'rgba(255,255,255,0.7)' : 'var(--muted)') + ';">' + dateStr + '</span>'
+      + '<span style="margin-left:auto;font-size:0.72rem;font-weight:600;background:' + (isCurrentDay ? 'rgba(255,255,255,0.2)' : '#e0e4ea') + ';color:' + (isCurrentDay ? '#fff' : '#555') + ';padding:2px 7px;border-radius:10px;">' + s.items.length + ' change' + (s.items.length !== 1 ? 's' : '') + '</span>'
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:0;">'
+      + s.items.map((ci, idx) => {
+          const sub = ci.sub ? '<div style="font-size:0.73rem;color:' + ci.color + ';opacity:.75;margin-top:1px;">' + ci.sub + '</div>' : '';
+          return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:' + ci.bg + ';' + (idx > 0 ? 'border-top:1px solid ' + ci.border + ';' : '') + '">'
+            + '<span style="font-size:0.95rem;flex-shrink:0;margin-top:1px;">' + ci.icon + '</span>'
+            + '<div style="flex:1;min-width:0;font-size:0.81rem;color:' + ci.color + ';font-weight:500;">' + ci.text + sub + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div></div>';
+  }).join('');
 }
 
 function renderTodaysChangesBox(data) {
