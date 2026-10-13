@@ -423,12 +423,21 @@ function setClientOverride(cid,day,blockIdx,from,to){
   markDirty();render();
   showToast(`${gcN(cid)?.name} block adjusted to ${from} – ${to} for today only`,false);
 }
+function removeLastLogEntry(type,id){
+  // Remove the most recent log entry matching this type+id from today
+  var today=todayISO();
+  if(!S.eventLog)return;
+  for(var li=S.eventLog.length-1;li>=0;li--){
+    var e=S.eventLog[li];
+    if(e.date===today&&e.type===type&&e.id===id){S.eventLog.splice(li,1);markDirty();break;}
+  }
+}
 function undoChangeItem(i){
   var ci=(window._changeItemsData||[])[i];
   if(!ci||!ci.undo)return;
   var u=ci.undo;
-  if(u.type==='staff-callout'){rmCO(u.sid);markDirty();render();showToast('Removed callout — '+u.label.replace('Restore ',''),false);}
-  else if(u.type==='client-cancel'){rmClientCO(u.cid);showToast(u.label,false);}
+  if(u.type==='staff-callout'){rmCO(u.sid);removeLastLogEntry('staff-callout',u.sid);markDirty();render();showToast('Removed callout — '+u.label.replace('Restore ',''),false);}
+  else if(u.type==='client-cancel'){rmClientCO(u.cid);removeLastLogEntry('client-cancel',u.cid);showToast(u.label,false);}
   else if(u.type==='time-override'){
     if(S.clientOverrides[u.cid]){
       var iso2=todayISO();
