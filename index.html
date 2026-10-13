@@ -544,6 +544,7 @@
         <p>Today's staff–client assignments at a glance</p>
       </div>
       <div class="date-badge" id="today-date"></div>
+      <button onclick="manualRefresh()" id="refresh-btn" title="Refresh" style="background:none;border:1px solid #ddd;border-radius:8px;padding:6px 10px;font-size:1.1rem;cursor:pointer;color:#555;line-height:1;">🔄</button>
     </div>
     <!-- PUSH NOTIFICATION BANNER -->
     <div id="push-banner" style="display:none;background:#EBF5FF;border:1px solid #B3D4F5;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -2159,6 +2160,15 @@ function init() {
   fetchCoverageFromSupabase();
   fetchRemindersFromSupabase();
   fetchTodaysChanges();
+
+  async function manualRefresh() {
+    const btn = document.getElementById('refresh-btn');
+    if (btn) { btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
+    await fetchTodaysChanges();
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; }
+  }
+  window.manualRefresh = manualRefresh;
+
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
   setInterval(fetchWeeklySchedule, 5 * 60 * 1000);
   setInterval(fetchTodaysChanges, 60 * 1000); // refresh Today's Changes every minute
