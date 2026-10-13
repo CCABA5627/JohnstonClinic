@@ -1330,11 +1330,12 @@ function openSetPin(i) {
   if (pin === '') {
     delete accounts[s.name];
     saveData('cc_staff_accounts', accounts);
+    pushStaffProfilesToSupabase();
     showToast('PIN removed for ' + s.name + '.');
   } else if (/^\d{4,6}$/.test(pin)) {
     accounts[s.name] = pin;
     saveData('cc_staff_accounts', accounts);
-    showToast('PIN set for ' + s.name + '! ✅');
+    pushStaffProfilesToSupabase().then(() => showToast('PIN set for ' + s.name + '! ✅ Synced to all devices.'));
   } else {
     showToast('PIN must be 4-6 digits only.');
   }
@@ -1357,8 +1358,12 @@ function editRBT(i) {
 }
 async function pushStaffProfilesToSupabase() {
   try {
-    const payload = { id: 'staff_profiles', data: JSON.stringify(staffList), updated_at: new Date().toISOString() };
-    // Try upsert into schedule_state (always exists)
+    const accounts = loadData('cc_staff_accounts', {});
+    const payload = {
+      id: 'staff_profiles',
+      data: JSON.stringify({ profiles: staffList, accounts: accounts }),
+      updated_at: new Date().toISOString()
+    };
     const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule_state`, {
       method: 'POST',
       headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },

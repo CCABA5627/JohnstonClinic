@@ -927,14 +927,23 @@ async function fetchStaffFromSupabase() {
     });
     const rows = await res.json();
     if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
-      const profiles = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-      if (Array.isArray(profiles) && profiles.length > 0) {
+      const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+      // Support both old format (array) and new format ({profiles, accounts})
+      const profiles = Array.isArray(raw) ? raw : (raw.profiles || []);
+      const accounts = Array.isArray(raw) ? null : (raw.accounts || null);
+      if (profiles.length > 0) {
         staffList = profiles.map(r => ({
           name: r.name,
           role: r.role || 'RBT',
           facts: r.facts || { hometown:'—', fave_food:'—', hobbies:'—', fave_show:'—', fun_fact:'—' }
         }));
         saveData('cc_staff', staffList);
+      }
+      // Sync PIN accounts from cloud — merge with any local ones
+      if (accounts) {
+        const localAccounts = loadData('cc_staff_accounts', {});
+        const merged = Object.assign({}, accounts, localAccounts);
+        saveData('cc_staff_accounts', merged);
       }
     } else {
       // Fallback: staff_names (only names, from scheduling site push)
