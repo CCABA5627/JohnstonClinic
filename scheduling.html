@@ -262,6 +262,10 @@ async function pushToPortal() {
     // Also push staff schedules
     await pushStaffSchedules();
 
+    // Refresh Today tab data so _changeItemsData is current, then save portalChanges to schedule_state
+    rToday();
+    await doSave(true);
+
     const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     status.textContent = '\u2713 Pushed ' + rows.length + ' assignments at ' + time;
     status.style.color = '#1D9E75';
@@ -964,6 +968,8 @@ async function tryLoad(){
 
 async function doSave(silent){
   try{
+    // Refresh Today tab computation so _changeItemsData reflects the latest state
+    rToday();
     // Build a plain-text portal summary from the computed changeItems (set by rToday)
     const stripHTML=s=>s.replace(/<[^>]*>/g,'');
     const portalChanges=(window._changeItemsData||[]).map(ci=>({
