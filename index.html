@@ -552,6 +552,10 @@
       <button id="push-enable-btn" onclick="enablePushNotifications()" style="background:#1E3A5F;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Enable Notifications</button>
       <button onclick="document.getElementById('push-banner').style.display='none';localStorage.setItem('push-dismissed','1')" style="background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer;padding:0 4px;">✕</button>
     </div>
+    <!-- MANUAL PUSH BUTTON (always visible until enabled) -->
+    <div id="push-manual-btn-wrap" style="margin-bottom:14px;display:none;">
+      <button onclick="enablePushNotifications()" style="width:100%;background:#1E3A5F;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;">🔔 Enable Schedule Notifications</button>
+    </div>
     <!-- TODAY'S CHANGES BOX (pulled from scheduling site) -->
     <div id="todays-changes-box" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
       <div style="font-size:0.92rem;font-weight:700;color:#333;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
@@ -2268,6 +2272,8 @@ async function enablePushNotifications() {
 
     // Hide banner, show confirmation
     document.getElementById('push-banner').style.display = 'none';
+    const manual = document.getElementById('push-manual-btn-wrap');
+    if (manual) manual.style.display = 'none';
     showPortalToast('🔔 Notifications enabled!');
   } catch (e) {
     console.error('[Push] Subscribe failed:', e);
@@ -2318,10 +2324,12 @@ async function initPWA() {
     return;
   }
   if (Notification.permission === 'denied') return;
-  // Show banner after a short delay so page loads first
+  // Show banner and manual button after a short delay so page loads first
   setTimeout(() => {
     const banner = document.getElementById('push-banner');
     if (banner) banner.style.display = 'flex';
+    const manual = document.getElementById('push-manual-btn-wrap');
+    if (manual) manual.style.display = 'block';
   }, 1500);
 }
 
