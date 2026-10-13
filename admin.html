@@ -201,7 +201,6 @@
   <div class="nav-section-label">Overview</div>
   <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
   <div class="nav-section-label">Manage</div>
-  <div class="nav-item" onclick="showPage('assignments')" id="nav-assignments"><span class="icon">📋</span><span>Today's Assignments</span></div>
   <div class="nav-item" onclick="showPage('rbt-mgmt')" id="nav-rbt-mgmt"><span class="icon">👥</span><span>Staff Profiles</span></div>
   <div class="nav-item" onclick="showPage('training-mgmt')" id="nav-training-mgmt"><span class="icon">🎓</span><span>Training Pairs</span></div>
   <div class="nav-section-label">Celebrate</div>
@@ -242,23 +241,6 @@
       <div class="card">
         <div class="card-title"><span class="dot" style="background:var(--green)"></span>Recent Shoutouts</div>
         <div id="dash-shoutouts"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ASSIGNMENTS -->
-  <section class="page-section" id="page-assignments">
-    <div class="topbar">
-      <div class="topbar-title"><h2>📋 Today's Assignments</h2><p>Manage who has who today</p></div>
-      <button class="btn btn-green" onclick="openModal('modal-assignment')">+ Add Assignment</button>
-    </div>
-    <div class="card">
-      <div class="data-table-wrap"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Staff</th><th>Client</th><th>Time</th><th>Location</th><th>Action</th></tr></thead>
-      <tbody id="assignment-table"></tbody></table></div>
-    </div>
-    <div class="card" style="background:var(--blue-light);border:1.5px solid rgba(74,144,217,0.2);">
-      <div style="font-size:0.85rem;color:var(--blue-dark);">
-        <strong>🔗 Scheduling Integration:</strong> To automatically pull assignments from your scheduling platform (e.g., CentralReach, Catalyst, Rethink), your IT admin can connect via API/webhook. The assignments above will update in real-time. <a href="#" style="color:var(--blue);font-weight:600;">Learn more about integration →</a>
       </div>
     </div>
   </section>
@@ -1217,8 +1199,7 @@ function renderDashboard() {
     });
   });
   document.getElementById('stat-row').innerHTML =
-    '<div class="stat-card"><div class="stat-val">' + assignments.length + '</div><div class="stat-label">📋 Assignments Today</div></div>'
-    + '<div class="stat-card"><div class="stat-val">' + staffList.length + '</div><div class="stat-label">👥 Active RBTs</div></div>'
+    '<div class="stat-card"><div class="stat-val">' + staffList.length + '</div><div class="stat-label">👥 Active RBTs</div></div>'
     + '<div class="stat-card"><div class="stat-val" style="color:' + (unread>0?'var(--coral)':'var(--green)') + '">' + unread + '</div><div class="stat-label">💬 Unread Feedback</div></div>'
     + '<div class="stat-card" style="cursor:pointer;" onclick="showPage(\'coverage-mgmt\')">'
     + '<div class="stat-val" style="color:' + (openReqs>0?'var(--coral)':'var(--green)') + '">' + openReqs + '</div>'
