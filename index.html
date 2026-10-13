@@ -547,7 +547,6 @@
         <p>Today's staff–client assignments at a glance</p>
       </div>
       <div class="date-badge" id="today-date"></div>
-      <button onclick="manualRefresh()" id="refresh-btn" title="Refresh" style="background:none;border:1px solid #ddd;border-radius:8px;padding:6px 10px;font-size:1.1rem;cursor:pointer;color:#555;line-height:1;">🔄</button>
     </div>
     <!-- PUSH NOTIFICATION BANNER -->
     <div id="push-banner" style="display:none;background:#EBF5FF;border:1px solid #B3D4F5;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -980,6 +979,12 @@ async function fetchTodaysChanges() {
     }
     const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     console.log('[fetchTodaysChanges] portalChanges:', raw.portalChanges);
+    console.log('[fetchTodaysChanges] weeklyChanges present:', !!raw.weeklyChanges, 'keys:', raw.weeklyChanges ? Object.keys(raw.weeklyChanges) : 'NONE');
+    if (raw.weeklyChanges) {
+      Object.entries(raw.weeklyChanges).forEach(([day, entry]) => {
+        console.log('[WeeklyChanges]', day, 'iso:', entry?.iso, 'items:', entry?.items?.length, entry?.items?.map(i=>i.text));
+      });
+    }
     renderTodaysChangesBox(raw);
     renderWeeklyChangesBox(raw);
   } catch(e) {
