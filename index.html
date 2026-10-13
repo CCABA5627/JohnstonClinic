@@ -931,16 +931,23 @@ async function fetchAssignmentsFromSupabase() {
 }
 
 async function fetchTodaysChanges() {
+  const inner = document.getElementById('todays-changes-inner');
+  const box = document.getElementById('todays-changes-box');
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/schedule_state?id=eq.main`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     const rows = await res.json();
-    if (!Array.isArray(rows) || rows.length === 0 || !rows[0].data) return;
+    if (!Array.isArray(rows) || rows.length === 0 || !rows[0].data) {
+      if (box) box.style.display = 'block';
+      if (inner) inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No scheduling data found.</div>';
+      return;
+    }
     const raw = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     renderTodaysChangesBox(raw);
   } catch(e) {
-    // silently fail — box stays hidden
+    if (box) box.style.display = 'block';
+    if (inner) inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">Could not load changes.</div>';
   }
 }
 
