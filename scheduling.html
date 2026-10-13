@@ -193,11 +193,11 @@ input:focus,select:focus{outline:none;border-color:#7F77DD;}
   <div class="nav">
     <span class="nav-brand">CCABA Scheduling</span>
     <div class="nav-tab active" data-tab="today" onclick="go('today')">Today</div>
+    <div class="nav-tab" data-tab="callout" onclick="go('callout')">Callout</div>
     <div class="nav-tab" data-tab="week" onclick="go('week')">Weekly</div>
     <div class="nav-tab" data-tab="clients" onclick="go('clients')">Clients</div>
     <div class="nav-tab" data-tab="staff" onclick="go('staff')">Staff</div>
     <div class="nav-tab" data-tab="pods" onclick="go('pods')">Pods</div>
-    <div class="nav-tab" data-tab="callout" onclick="go('callout')">Callout</div>
     <div class="nav-tab" data-tab="data" onclick="go('data')">Edit Data</div>
     <div class="nav-tab" data-tab="save" onclick="go('save')">Save/Load</div>
     <div class="nav-tab" data-tab="reports" onclick="go('reports')">📊 Reports</div>
@@ -1544,6 +1544,7 @@ const hasOverride=(S.clientOverrides[S.calloutClient]||[]).length>0;
         :`<div style="font-size:11px;color:#888;margin-bottom:6px;">Use the Today tab sidebar "📅 Today-only schedule adjust" section to adjust individual blocks.</div>`
       }
     </div>`;
+  const isCancelled=S.calledOutClients.includes(S.calloutClient);
   let freedStaff=[];
   if(isCancelled&&selC){const freedSlots={};DAYS.forEach(d=>{(selC.schedule[d]||[]).forEach(blk=>{if(!blk.staffId)return;if(!freedSlots[blk.staffId])freedSlots[blk.staffId]=[];freedSlots[blk.staffId].push({day:d,from:blk.from,to:blk.to});});});freedStaff=Object.entries(freedSlots).map(([sid,slots])=>({sid,slots,name:gsN(sid)?.name||'?'}));}
   return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Clients</div>${S.clients.map(c=>{const cancelled=S.calledOutClients.includes(c.id);const hasOv=(S.clientOverrides[c.id]||[]).length>0;return`<div class="si2 ${S.calloutClient===c.id?'sel':''}" onclick="S.calloutClient='${c.id}';render()"><div class="av av-c">${ini(c.name)}</div><span class="nm">${c.name}</span>${cancelled?'<span class="bx" style="background:#EEEDFE;color:#3C3489">Cancelled</span>':hasOv?'<span class="bx" style="background:#FFF8EC;color:#b87a00">Adjusted</span>':''}</div>`;}).join('')}</div></div><div class="content">${modeBtns}${!S.calloutClient?`<div class="es">Select a client to manage their today settings</div>`:`<div class="cob" style="background:#F0F0FE;border-color:#AFA9EC;"><div class="cot" style="color:#3C3489;">📵 ${selC?.name}</div><div style="font-size:12px;color:#534AB7;margin-bottom:.625rem">Cancelling removes all their sessions from Today's view and frees up their assigned staff.</div><div style="display:flex;gap:6px">${isCancelled?`<button class="btn btn-sm" onclick="rmClientCO('${S.calloutClient}')">✓ Restore — mark as attending</button>`:`<button class="btn btn-sm" style="background:#534AB7;color:#fff;border-color:#534AB7" onclick="mkClientCO2('${S.calloutClient}')">Mark ${selC?.name} as cancelled today</button>`}</div>${!isCancelled?overrideUI:''}</div>${isCancelled&&freedStaff.length>0?`<div class="card"><div class="ch"><div class="ct">🟢 Staff now freed up</div></div><p style="font-size:12px;color:#888;margin-bottom:.75rem">These staff members had sessions with ${selC?.name} and are now available.</p>${freedStaff.map(f=>`<div style="padding:10px 0;border-bottom:0.5px solid rgba(0,0,0,.1)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div class="av av-s" style="width:28px;height:28px">${ini(f.name)}</div><strong style="font-size:13px">${f.name}</strong></div><div style="display:flex;flex-wrap:wrap;gap:5px">${f.slots.map(sl=>`<span style="background:#E1F5EE;color:#085041;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600">${sl.day} ${sl.from} \u2013 ${sl.to} \u2014 now free</span>`).join('')}</div></div>`).join('')}</div>`:''}${!isCancelled?`<div class="card"><div class="ch"><div class="ct">Scheduled sessions for ${selC?.name}</div></div>${DAYS.map(d=>{const blocks=selC?.schedule[d]||[];if(!blocks.length)return'';return`<div style="padding:6px 0;border-bottom:0.5px solid rgba(0,0,0,.08)"><strong style="font-size:11px;color:#534AB7">${d}</strong><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:5px">${blocks.map(blk=>`<span style="background:#E6F1FB;color:#185FA5;padding:2px 9px;border-radius:8px;font-size:11px">${blk.from} \u2013 ${blk.to}${blk.staffId?' \u2014 '+gsN(blk.staffId)?.name:' \u2014 unassigned'}</span>`).join('')}</div></div>`;}).join('')||'<div style="font-size:12px;color:#888">No scheduled sessions.</div>'}</div>`:''}`}</div></div>`;
@@ -1594,8 +1595,8 @@ function logEvent(type,subtype,id,name){
   S.eventLog.push({date:new Date().toISOString().slice(0,10),type,subtype,id,name});
   markDirty();
 }
-function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);render();}
-function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);render();}
+function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);markDirty();render();showToast(`${s?.name||'Staff'} marked out all day`,false);}
+function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);const s=gsN(sid);markDirty();render();showToast(`${s?.name||'Staff'} marked available`,false);}
 function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
 function mkClientCO2(cid){
   const c=gcN(cid);
