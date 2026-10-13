@@ -1010,7 +1010,9 @@ function computePortalChanges(){
 async function doSave(silent){
   try{
     // Build a plain-text portal summary directly (no DOM rendering needed)
-    const portalChanges=computePortalChanges().map(ci=>({
+    const rawChanges=computePortalChanges();
+    console.log('[doSave] portalChanges computed:',rawChanges.length,'items',rawChanges.map(c=>c.text));
+    const portalChanges=rawChanges.map(ci=>({
       icon:ci.icon,text:ci.text,sub:ci.sub||'',
       color:ci.color,bg:ci.bg,border:ci.border
     }));
@@ -1019,10 +1021,12 @@ async function doSave(silent){
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
     // Save to Supabase
     updSI('saving');
-    await fetch(SB_STATE_URL,{method:'POST',headers:SB_HDR,body:JSON.stringify({id:'main',data:d,updated_at:new Date().toISOString()})});
+    const sbRes=await fetch(SB_STATE_URL,{method:'POST',headers:SB_HDR,body:JSON.stringify({id:'main',data:d,updated_at:new Date().toISOString()})});
+    console.log('[doSave] Supabase response:',sbRes.status,sbRes.ok);
     S.dirty=false;S.lastSaved=d.savedAt;updSI();
     if(!silent)showToast('Saved ✓',false);
   }catch(e){
+    console.error('[doSave] error:',e);
     // Fall back to just localStorage
     try{const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,savedAt:new Date().toISOString()};localStorage.setItem(SK,JSON.stringify(d));S.dirty=false;S.lastSaved=d.savedAt;updSI();}catch(e2){}
     if(!silent)showToast('Saved locally (cloud unavailable)',false);
