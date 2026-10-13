@@ -463,6 +463,9 @@
 <button id="hamburger" aria-label="Open menu">☰</button>
 <div id="sidebar-overlay"></div>
 
+<!-- Global fixed refresh button -->
+<button id="global-refresh-btn" onclick="globalRefresh()" title="Refresh" style="position:fixed;top:12px;right:14px;z-index:400;background:#1E3A5F;color:#fff;border:none;border-radius:50%;width:42px;height:42px;font-size:1.1rem;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:opacity 0.2s;line-height:1;">🔄</button>
+
 <!-- STAFF LOGIN SCREEN -->
 <div id="staff-login-screen">
   <div class="staff-login-box">
@@ -992,6 +995,7 @@ function renderWeeklyChangesBox(data) {
   if (!inner) return;
 
   const weeklyChanges = data.weeklyChanges || {};
+  console.log('[WeeklyChanges] keys:', Object.keys(weeklyChanges), JSON.stringify(weeklyChanges).slice(0,300));
   const today = new Date();
   today.setHours(0,0,0,0);
 
@@ -2238,6 +2242,16 @@ function init() {
     if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; }
   }
   window.manualRefresh = manualRefresh;
+
+  async function globalRefresh() {
+    const btn = document.getElementById('global-refresh-btn');
+    if (btn) { btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; btn.textContent = '⏳'; }
+    try {
+      await Promise.all([fetchTodaysChanges(), fetchWeeklySchedule()]);
+    } catch(e) {}
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; btn.textContent = '🔄'; }
+  }
+  window.globalRefresh = globalRefresh;
 
   setInterval(fetchAssignmentsFromSupabase, 5 * 60 * 1000);
   setInterval(fetchWeeklySchedule, 5 * 60 * 1000);
