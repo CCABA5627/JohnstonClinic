@@ -1291,7 +1291,8 @@ function renderRBTTable() {
       + '</td>'
       + '<td>'
       + '<button class="btn btn-primary btn-sm" data-action="edit-rbt" data-idx="' + i + '" style="margin-right:4px;">Edit</button>'
-      + '<button class="btn btn-sm" data-action="set-pin" data-idx="' + i + '" style="background:var(--gold-light);border:1.5px solid var(--gold);color:#a06000;">' + (hasPin ? '🔑 Reset PIN' : '🔑 Set PIN') + '</button>'
+      + '<button class="btn btn-sm" data-action="set-pin" data-idx="' + i + '" style="margin-right:4px;background:var(--gold-light);border:1.5px solid var(--gold);color:#a06000;">' + (hasPin ? '🔑 Reset PIN' : '🔑 Set PIN') + '</button>'
+      + ((['BCBA','COD'].includes(s.role)) ? '<button class="btn btn-danger btn-sm" data-action="delete-rbt" data-idx="' + i + '">Delete</button>' : '')
       + '</td></tr>';
   }).join('');
 
@@ -1301,6 +1302,7 @@ function renderRBTTable() {
     var idx = parseInt(btn.getAttribute('data-idx'), 10);
     var action = btn.getAttribute('data-action');
     if (action === 'edit-rbt') editRBT(idx);
+    if (action === 'delete-rbt') deleteRBT(idx);
     if (action === 'set-pin') openSetPin(idx);
   };
 }
