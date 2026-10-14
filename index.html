@@ -2252,7 +2252,12 @@ function init() {
     const btn = document.getElementById('global-refresh-btn');
     if (btn) { btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; btn.textContent = '⏳'; }
     try {
-      await Promise.all([fetchTodaysChanges(), fetchWeeklySchedule()]);
+      await Promise.all([
+        fetchTodaysChanges(),
+        fetchWeeklySchedule(),
+        fetchAssignmentsFromSupabase(),
+        fetchStaffFromSupabase()
+      ]);
     } catch(e) {}
     if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; btn.textContent = '🔄'; }
   }
