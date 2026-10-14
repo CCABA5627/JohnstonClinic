@@ -455,13 +455,30 @@ async function pushStaffSchedules() {
       const existingProfiles = profData.profiles || {};
       const accounts = profData.accounts || {};
 
-      // Build updated profiles: keep existing details, add blanks for new staff, drop deleted
+      // Build updated profiles:
+      // - Keep admin-added staff (source !== 'scheduling') untouched
+      // - Add blank profiles for new scheduling staff
+      // - Remove profiles for deleted scheduling staff
       const existingByName = {};
       (Array.isArray(existingProfiles) ? existingProfiles : []).forEach(p => { existingByName[p.name] = p; });
-      const profiles = S.staff.map(s => existingByName[s.name] || { name: s.name, role: 'RBT', facts: {} });
 
-      // Remove accounts for deleted staff
-      Object.keys(accounts).forEach(k => { if(!activeNames.has(k)) delete accounts[k]; });
+      // Non-scheduling staff (BCBAs, supervisors, etc added via admin page) — keep as-is
+      const nonSchedProfiles = (Array.isArray(existingProfiles) ? existingProfiles : [])
+        .filter(p => p.source !== 'scheduling' && !activeNames.has(p.name));
+
+      // Scheduling staff — sync from S.staff
+      const schedProfiles = S.staff.map(s => {
+        const existing = existingByName[s.name];
+        return existing ? { ...existing, source: 'scheduling' } : { name: s.name, role: 'RBT', facts: {}, source: 'scheduling' };
+      });
+
+      const profiles = [...nonSchedProfiles, ...schedProfiles];
+
+      // Remove accounts only for deleted scheduling staff
+      Object.keys(accounts).forEach(k => {
+        const prof = existingByName[k];
+        if(prof && prof.source === 'scheduling' && !activeNames.has(k)) delete accounts[k];
+      });
 
       const updated = { id: 'staff_profiles', data: JSON.stringify({ profiles, accounts }), updated_at: new Date().toISOString() };
       await fetch(`${SUPABASE_URL}/rest/v1/schedule_state`, {
