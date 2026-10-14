@@ -2322,6 +2322,25 @@ async function registerServiceWorker() {
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
     console.log('[SW] Registered:', reg.scope);
+
+    // If a new service worker is waiting, activate it immediately
+    if (reg.waiting) {
+      reg.waiting.postMessage('skipWaiting');
+    }
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // New SW ready — tell it to take over, then reload to get fresh content
+          newWorker.postMessage('skipWaiting');
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+          }, { once: true });
+        }
+      });
+    });
+
     return reg;
   } catch (e) {
     console.warn('[SW] Registration failed:', e);

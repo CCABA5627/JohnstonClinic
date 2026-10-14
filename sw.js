@@ -1,35 +1,57 @@
 // Johnston Clinic Staff Portal — Service Worker
 // Handles push notifications and basic offline caching
 
-const CACHE_NAME = 'johnston-portal-v1';
+const CACHE_NAME = 'johnston-portal-v5';
 const OFFLINE_URLS = ['/index.html', '/manifest.json'];
 
-// ── Install: cache shell ──────────────────────────────────────────────────────
+// ── Install: cache shell, skip waiting immediately ───────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE_URLS))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // take control immediately, don't wait for old SW to die
 });
 
-// ── Activate: clean old caches ───────────────────────────────────────────────
+// ── Activate: clean ALL old caches, claim clients ────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim()) // take control of all open tabs/windows
   );
-  self.clients.claim();
 });
 
-// ── Fetch: network-first for API calls, cache-first for shell ────────────────
+// ── Fetch: always network-first, never serve stale HTML ──────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // Let Supabase API calls go straight to network
+
+  // Let Supabase API calls go straight to network, no caching
   if (url.hostname.includes('supabase.co')) return;
+
+  // For HTML pages: always try network first, cache only as offline fallback
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then(res => {
+          // Update cache with fresh response
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // For everything else: network first, cache fallback
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
+});
+
+// ── Message: allow page to tell SW to skip waiting ───────────────────────────
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 // ── Push: show notification ───────────────────────────────────────────────────
@@ -39,7 +61,7 @@ self.addEventListener('push', event => {
 
   const options = {
     body: data.body,
-    tag: data.tag || 'schedule-update',   // collapses duplicate notifs
+    tag: data.tag || 'schedule-update',
     renotify: true,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
