@@ -255,8 +255,7 @@
   <!-- RBT MANAGEMENT -->
   <section class="page-section" id="page-rbt-mgmt">
     <div class="topbar">
-      <div class="topbar-title"><h2>👥 Staff Profiles</h2><p>Manage staff profiles and fun facts</p></div>
-      <button class="btn btn-green" onclick="openModal('modal-rbt')">+ Add RBT</button>
+      <div class="topbar-title"><h2>👥 Staff Profiles</h2><p>Edit profile details. To add or remove staff, use the Scheduling site and Push to Staff Portal.</p></div>
     </div>
     <div class="card">
       <div class="data-table-wrap"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Hometown</th><th>Favorite Food</th><th>PIN</th><th>Actions</th></tr></thead>
@@ -1291,8 +1290,7 @@ function renderRBTTable() {
       + '</td>'
       + '<td>'
       + '<button class="btn btn-primary btn-sm" data-action="edit-rbt" data-idx="' + i + '" style="margin-right:4px;">Edit</button>'
-      + '<button class="btn btn-sm" data-action="set-pin" data-idx="' + i + '" style="margin-right:4px;background:var(--gold-light);border:1.5px solid var(--gold);color:#a06000;">' + (hasPin ? '🔑 Reset PIN' : '🔑 Set PIN') + '</button>'
-      + '<button class="btn btn-danger btn-sm" data-action="delete-rbt" data-idx="' + i + '">Delete</button>'
+      + '<button class="btn btn-sm" data-action="set-pin" data-idx="' + i + '" style="background:var(--gold-light);border:1.5px solid var(--gold);color:#a06000;">' + (hasPin ? '🔑 Reset PIN' : '🔑 Set PIN') + '</button>'
       + '</td></tr>';
   }).join('');
 
@@ -1302,7 +1300,6 @@ function renderRBTTable() {
     var idx = parseInt(btn.getAttribute('data-idx'), 10);
     var action = btn.getAttribute('data-action');
     if (action === 'edit-rbt') editRBT(idx);
-    if (action === 'delete-rbt') deleteRBT(idx);
     if (action === 'set-pin') openSetPin(idx);
   };
 }
