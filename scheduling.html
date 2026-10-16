@@ -275,7 +275,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // Send push notification to all subscribed staff via Edge Function
 async function sendStaffPushNotification({title, body, tag} = {}) {
   try {
-    await fetch(`${SUPABASE_URL}/functions/v1/notify-staff`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/notify-staff`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,8 +283,16 @@ async function sendStaffPushNotification({title, body, tag} = {}) {
       },
       body: JSON.stringify({ title, body, tag }),
     });
+    const text = await res.text();
+    if (!res.ok) {
+      showToast('Push notification error (' + res.status + '): ' + text, true);
+      console.error('[Push] notify-staff failed:', res.status, text);
+    } else {
+      console.log('[Push] notify-staff result:', text);
+    }
   } catch (e) {
-    console.warn('[Push] notify-staff call failed (non-fatal):', e.message);
+    console.warn('[Push] notify-staff call failed:', e.message);
+    showToast('Push notification error: ' + e.message, true);
   }
 }
 
