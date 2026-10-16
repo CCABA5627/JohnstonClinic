@@ -2379,28 +2379,36 @@ async function enablePushNotifications() {
   }
   if (btn) { btn.textContent = 'Enabling…'; btn.disabled = true; }
   try {
-    // Request permission
+    // Step 1: Request permission
+    alert('Step 1: Requesting permission…');
     const perm = await Notification.requestPermission();
+    alert('Step 1 result: ' + perm);
     if (perm !== 'granted') {
-      if (btn) { btn.textContent = 'Permission denied'; }
+      if (btn) { btn.textContent = 'Permission denied'; btn.disabled = false; }
       return;
     }
 
-    // Get or register SW
-    let reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    // Step 2: Get service worker
+    alert('Step 2: Getting service worker…');
+    let reg = await navigator.serviceWorker.getRegistration();
+    alert('Step 2 result: ' + (reg ? 'found SW at ' + reg.scope : 'no SW, registering…'));
     if (!reg) reg = await registerServiceWorker();
     if (!reg) throw new Error('Service worker unavailable');
 
-    // Subscribe to push
+    // Step 3: Subscribe to push
+    alert('Step 3: Subscribing to push…');
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
+    alert('Step 3 result: subscribed! endpoint starts with: ' + sub.endpoint.substring(0, 60));
 
+    // Step 4: Save to Supabase
+    alert('Step 4: Saving to Supabase…');
     await saveSubscriptionToSupabase(sub);
-    localStorage.setItem('push-enabled', '1');
+    alert('Step 4 result: saved!');
 
-    // Hide banner, show confirmation
+    localStorage.setItem('push-enabled', '1');
     document.getElementById('push-banner').style.display = 'none';
     const manual = document.getElementById('push-manual-btn-wrap');
     if (manual) manual.style.display = 'none';
@@ -2409,7 +2417,7 @@ async function enablePushNotifications() {
     console.error('[Push] Subscribe failed:', e);
     if (btn) { btn.textContent = 'Enable Notifications'; btn.disabled = false; }
     const errMsg = e && e.message ? e.message : String(e);
-    alert('Push notification error:\n' + errMsg);
+    alert('FAILED at step above.\nError: ' + errMsg);
     showPortalToast('Could not enable notifications', true);
   }
 }
