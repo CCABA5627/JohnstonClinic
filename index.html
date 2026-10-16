@@ -2357,7 +2357,7 @@ async function saveSubscriptionToSupabase(sub) {
     auth: json.keys.auth,
     created_at: new Date().toISOString(),
   };
-  await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
     method: 'POST',
     headers: {
       'apikey': SUPABASE_KEY,
@@ -2367,6 +2367,10 @@ async function saveSubscriptionToSupabase(sub) {
     },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error('Supabase save failed (' + res.status + '): ' + errText);
+  }
 }
 
 async function enablePushNotifications() {
