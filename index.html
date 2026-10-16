@@ -2371,6 +2371,12 @@ async function saveSubscriptionToSupabase(sub) {
 
 async function enablePushNotifications() {
   const btn = document.getElementById('push-enable-btn');
+  // iOS only supports push when running as installed PWA (home screen)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (!isStandalone) {
+    alert('Notifications only work when the app is opened from your home screen.\n\nIn Safari: tap Share → Add to Home Screen, then open from there.');
+    return;
+  }
   if (btn) { btn.textContent = 'Enabling…'; btn.disabled = true; }
   try {
     // Request permission
@@ -2427,6 +2433,17 @@ async function initPWA() {
   // Register SW in background
   registerServiceWorker();
 
+  // Push notifications only work on iOS when running as a home screen PWA
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (!isStandalone) {
+    // Running in regular Safari tab — show "add to home screen" hint instead
+    const banner = document.getElementById('push-banner');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.innerHTML = '<span style="flex:1">📱 To enable notifications, tap <b>Share → Add to Home Screen</b> first, then open from your home screen.</span><button onclick="document.getElementById(\'push-banner\').style.display=\'none\';localStorage.setItem(\'push-dismissed\',\'1\')" style="background:none;border:none;color:inherit;font-size:1.3rem;cursor:pointer;margin-left:8px;">✕</button>';
+    }
+    return;
+  }
   // Show push banner if not already enabled/dismissed and browser supports it
   if (!('Notification' in window) || !('PushManager' in window)) return;
   if (localStorage.getItem('push-dismissed') === '1') return;
