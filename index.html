@@ -2402,7 +2402,9 @@ async function enablePushNotifications() {
   } catch (e) {
     console.error('[Push] Subscribe failed:', e);
     if (btn) { btn.textContent = 'Enable Notifications'; btn.disabled = false; }
-    showPortalToast('Could not enable notifications — try again', true);
+    const errMsg = e && e.message ? e.message : String(e);
+    alert('Push notification error:\n' + errMsg);
+    showPortalToast('Could not enable notifications', true);
   }
 }
 
