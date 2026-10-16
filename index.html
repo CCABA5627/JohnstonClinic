@@ -2379,45 +2379,44 @@ async function enablePushNotifications() {
   }
   if (btn) { btn.textContent = 'Enabling…'; btn.disabled = true; }
   try {
-    // Step 1: Request permission
-    alert('Step 1: Requesting permission…');
+    // Request permission — no alert before this, let iOS show its own prompt
     const perm = await Notification.requestPermission();
-    alert('Step 1 result: ' + perm);
     if (perm !== 'granted') {
-      if (btn) { btn.textContent = 'Permission denied'; btn.disabled = false; }
+      if (btn) { btn.textContent = 'Enable Notifications'; btn.disabled = false; }
+      alert('Permission result: ' + perm + '\n\nIf no prompt appeared, go to Settings → Apps → Safari → Notifications and make sure Allow is ON.');
       return;
     }
 
-    // Step 2: Get service worker
-    alert('Step 2: Getting service worker…');
-    let reg = await navigator.serviceWorker.getRegistration();
-    alert('Step 2 result: ' + (reg ? 'found SW at ' + reg.scope : 'no SW, registering…'));
-    if (!reg) reg = await registerServiceWorker();
-    if (!reg) throw new Error('Service worker unavailable');
+    if (btn) { btn.textContent = 'Almost there…'; }
 
-    // Step 3: Subscribe to push
-    alert('Step 3: Subscribing to push…');
+    // Get service worker
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) reg = await registerServiceWorker();
+    if (!reg) throw new Error('Service worker not available');
+
+    // Wait for SW to be ready
+    await navigator.serviceWorker.ready;
+
+    // Subscribe to push
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
-    alert('Step 3 result: subscribed! endpoint starts with: ' + sub.endpoint.substring(0, 60));
 
-    // Step 4: Save to Supabase
-    alert('Step 4: Saving to Supabase…');
+    // Save to Supabase
     await saveSubscriptionToSupabase(sub);
-    alert('Step 4 result: saved!');
-
     localStorage.setItem('push-enabled', '1');
+
     document.getElementById('push-banner').style.display = 'none';
     const manual = document.getElementById('push-manual-btn-wrap');
     if (manual) manual.style.display = 'none';
     showPortalToast('🔔 Notifications enabled!');
+    alert('✅ Notifications enabled successfully!');
   } catch (e) {
     console.error('[Push] Subscribe failed:', e);
     if (btn) { btn.textContent = 'Enable Notifications'; btn.disabled = false; }
     const errMsg = e && e.message ? e.message : String(e);
-    alert('FAILED at step above.\nError: ' + errMsg);
+    alert('Error: ' + errMsg);
     showPortalToast('Could not enable notifications', true);
   }
 }
