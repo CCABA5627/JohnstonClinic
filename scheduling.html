@@ -357,7 +357,7 @@ async function pushToPortal() {
     // Send push notifications to all subscribed staff
     await sendStaffPushNotification({
       title: 'Johnston Clinic \u2014 Schedule Updated',
-      body: rows.length + ' assignment' + (rows.length !== 1 ? 's' : '') + ' pushed at ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+      body: 'Schedule has been updated',
       tag: 'schedule-push',
     });
 
