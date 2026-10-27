@@ -932,22 +932,15 @@ function showPage(id) {
 
 // ===================== POINTS MANAGEMENT =====================
 async function loadPointsMgmt() {
-  // Populate staff dropdown
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const names = await res.json();
-    const sel = document.getElementById('pts-staff-select');
-    sel.innerHTML = '<option value="">Select staff…</option>';
-    if (Array.isArray(names)) {
-      names.forEach(n => {
-        const o = document.createElement('option');
-        o.value = n.name; o.textContent = n.name;
-        sel.appendChild(o);
-      });
-    }
-  } catch(e) { console.error(e); }
+  // Populate staff dropdown from staffList (Staff Profiles)
+  const sel = document.getElementById('pts-staff-select');
+  sel.innerHTML = '<option value="">Select staff…</option>';
+  const names = (staffList || []).map(s => s.name).sort();
+  names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    sel.appendChild(o);
+  });
 
   // Load leaderboard
   await refreshPointsLeaderboard();
