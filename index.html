@@ -1322,6 +1322,7 @@ function renderStaff() {
   if (latestStaff && Array.isArray(latestStaff) && latestStaff.length > 0) {
     staffList = latestStaff;
   }
+  staffList.sort((a, b) => a.name.localeCompare(b.name));
   const grid = document.getElementById('rbt-grid');
   grid.innerHTML = '';
   staffList.forEach((s, i) => {

@@ -1431,6 +1431,7 @@ function deleteAssignment(i) { assignments.splice(i,1); saveData('cc_assignments
 
 // ===================== RBT PROFILES =====================
 function renderRBTTable() {
+  staffList.sort((a, b) => a.name.localeCompare(b.name));
   var accounts = loadData('cc_staff_accounts', {});
   var el = document.getElementById('rbt-table');
   el.innerHTML = staffList.map((s,i) => {
