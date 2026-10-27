@@ -727,6 +727,7 @@
           <div id="points-my-score" style="font-size:3.5rem;font-weight:900;font-family:'Nunito',sans-serif;color:var(--blue-dark);line-height:1;">—</div>
           <div style="color:var(--muted);font-size:0.85rem;margin-top:6px;" id="points-my-name"></div>
         </div>
+        <div id="points-history" style="margin-top:8px;font-size:0.83rem;"></div>
       </div>
       <!-- Clinic Total -->
       <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
@@ -1626,6 +1627,30 @@ async function loadPoints() {
     const all = await res2.json();
     const total = Array.isArray(all) ? all.reduce((sum, r) => sum + (r.points || 0), 0) : 0;
     document.getElementById('points-clinic-total').textContent = total;
+
+    // Load history
+    const resH = await fetch(`${SUPABASE_URL}/rest/v1/points_history?staff_name=eq.${encodeURIComponent(staffName)}&order=created_at.desc&limit=20`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const history = await resH.json();
+    const histEl = document.getElementById('points-history');
+    if (Array.isArray(history) && history.length > 0) {
+      histEl.innerHTML = '<div style="font-weight:700;color:var(--blue-dark);margin-bottom:8px;">Recent Activity</div>' +
+        history.map(h => {
+          const date = new Date(h.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const sign = h.amount >= 0 ? '+' : '';
+          const color = h.amount >= 0 ? 'var(--green)' : 'var(--coral)';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray);">
+            <div>
+              <div style="font-size:0.83rem;color:var(--text);">${h.reason || 'Points update'}</div>
+              <div style="font-size:0.75rem;color:var(--muted);">${date}</div>
+            </div>
+            <strong style="color:${color};margin-left:12px;">${sign}${h.amount}</strong>
+          </div>`;
+        }).join('');
+    } else {
+      histEl.innerHTML = '';
+    }
 
     // Load config (how to earn + prizes)
     const res3 = await fetch(`${SUPABASE_URL}/rest/v1/points_config?id=eq.main`, {

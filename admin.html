@@ -1007,6 +1007,14 @@ async function updateStaffPoints() {
       });
     }
 
+    // Save to history log
+    const reason = document.getElementById('pts-reason').value.trim();
+    await fetch(`${SUPABASE_URL}/rest/v1/points_history`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ staff_name: name, amount, reason: reason || null, created_at: new Date().toISOString() })
+    });
+
     msg.style.color='var(--green)';
     msg.textContent = `✓ ${name} now has ${newPts} points (${amount >= 0 ? '+' : ''}${amount})`;
     document.getElementById('pts-amount').value = '';
