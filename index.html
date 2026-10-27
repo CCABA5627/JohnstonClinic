@@ -521,6 +521,9 @@
   <div class="nav-item" onclick="showPage('shoutouts')" id="nav-shoutouts">
     <span class="icon">⭐</span><span>Shoutouts</span>
   </div>
+  <div class="nav-item" onclick="showPage('points')" id="nav-points">
+    <span class="icon">🏆</span><span>Points</span>
+  </div>
   <div class="nav-section-label">Connect</div>
   <div class="nav-item" onclick="showPage('feedback')" id="nav-feedback">
     <span class="icon">💬</span><span>Share Feedback</span>
@@ -704,6 +707,46 @@
       <div>
         <div class="card-title" style="margin-bottom:14px;"><span class="dot" style="background:var(--gold)"></span>🌟 Staff Recognition</div>
         <div id="staff-shoutouts"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POINTS -->
+  <section class="page-section" id="page-points">
+    <div class="topbar">
+      <div class="topbar-title">
+        <h2>🏆 Points</h2>
+        <p>Earn points, earn prizes</p>
+      </div>
+    </div>
+    <div class="grid-2" style="gap:16px;">
+      <!-- My Points -->
+      <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div class="card-title" style="margin-bottom:18px;"><span class="dot" style="background:var(--gold)"></span>⭐ My Points</div>
+        <div style="text-align:center;padding:20px 0;">
+          <div id="points-my-score" style="font-size:3.5rem;font-weight:900;font-family:'Nunito',sans-serif;color:var(--blue-dark);line-height:1;">—</div>
+          <div style="color:var(--muted);font-size:0.85rem;margin-top:6px;" id="points-my-name"></div>
+        </div>
+      </div>
+      <!-- Clinic Total -->
+      <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div class="card-title" style="margin-bottom:18px;"><span class="dot" style="background:var(--green)"></span>🏥 Clinic Total</div>
+        <div style="text-align:center;padding:20px 0;">
+          <div id="points-clinic-total" style="font-size:3.5rem;font-weight:900;font-family:'Nunito',sans-serif;color:var(--green);line-height:1;">—</div>
+          <div style="color:var(--muted);font-size:0.85rem;margin-top:6px;">points earned by the whole team</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-2" style="gap:16px;margin-top:16px;">
+      <!-- How to Earn -->
+      <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div class="card-title" style="margin-bottom:14px;"><span class="dot" style="background:var(--blue)"></span>💡 How to Earn Points</div>
+        <div id="points-how-to-earn" style="font-size:0.88rem;color:var(--text);line-height:1.7;white-space:pre-wrap;">Loading…</div>
+      </div>
+      <!-- Prizes -->
+      <div class="card" style="background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div class="card-title" style="margin-bottom:14px;"><span class="dot" style="background:var(--coral)"></span>🎁 Prize Exchange</div>
+        <div id="points-prizes" style="font-size:0.88rem;color:var(--text);line-height:1.7;white-space:pre-wrap;">Loading…</div>
       </div>
     </div>
   </section>
@@ -1212,6 +1255,7 @@ function showPage(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
+  if (id === 'points') loadPoints();
 }
 
 // ===================== RENDER: TODAY =====================
@@ -1560,6 +1604,46 @@ function renderTraining() {
 }
 
 // ===================== RENDER: SHOUTOUTS =====================
+// ===================== POINTS =====================
+async function loadPoints() {
+  const staffName = window._loggedInStaff;
+  if (!staffName) return;
+  document.getElementById('points-my-name').textContent = staffName;
+
+  try {
+    // Load this staff member's points
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_points?staff_name=eq.${encodeURIComponent(staffName)}`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    const myPoints = (data && data[0]) ? data[0].points : 0;
+    document.getElementById('points-my-score').textContent = myPoints;
+
+    // Load clinic total
+    const res2 = await fetch(`${SUPABASE_URL}/rest/v1/staff_points?select=points`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const all = await res2.json();
+    const total = Array.isArray(all) ? all.reduce((sum, r) => sum + (r.points || 0), 0) : 0;
+    document.getElementById('points-clinic-total').textContent = total;
+
+    // Load config (how to earn + prizes)
+    const res3 = await fetch(`${SUPABASE_URL}/rest/v1/points_config?id=eq.main`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const cfg = await res3.json();
+    if (cfg && cfg[0]) {
+      document.getElementById('points-how-to-earn').textContent = cfg[0].how_to_earn || 'No information yet.';
+      document.getElementById('points-prizes').textContent = cfg[0].prizes || 'No prizes listed yet.';
+    } else {
+      document.getElementById('points-how-to-earn').textContent = 'No information yet.';
+      document.getElementById('points-prizes').textContent = 'No prizes listed yet.';
+    }
+  } catch(e) {
+    console.error('Points load error:', e);
+  }
+}
+
 function renderShoutouts() {
   const cc = document.getElementById('client-shoutouts');
   cc.innerHTML = '';

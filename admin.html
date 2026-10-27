@@ -212,6 +212,7 @@
   <div class="nav-item" onclick="showPage('training-mgmt')" id="nav-training-mgmt"><span class="icon">🎓</span><span>Training Pairs</span></div>
   <div class="nav-section-label">Celebrate</div>
   <div class="nav-item" onclick="showPage('shoutouts-mgmt')" id="nav-shoutouts-mgmt"><span class="icon">⭐</span><span>Shoutouts</span></div>
+  <div class="nav-item" onclick="showPage('points-mgmt')" id="nav-points-mgmt"><span class="icon">🏆</span><span>Points</span></div>
   <div class="nav-section-label">Communication</div>
   <div class="nav-item" onclick="showPage('feedback-mgmt')" id="nav-feedback-mgmt">
     <span class="icon">💬</span><span>Feedback</span>
@@ -322,6 +323,48 @@
       <div class="card">
         <div class="card-title"><span class="dot" style="background:var(--gold)"></span>Staff Shoutouts (Posted)</div>
         <div id="ss-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POINTS MANAGEMENT -->
+  <section class="page-section" id="page-points-mgmt">
+    <div class="topbar">
+      <div class="topbar-title"><h2>🏆 Points</h2><p>Manage staff points and prize settings</p></div>
+    </div>
+    <div class="grid-2" style="gap:16px;">
+      <!-- Update Staff Points -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;"><span class="dot" style="background:var(--gold)"></span>Update Staff Points</div>
+        <div class="form-group">
+          <label>Staff Member</label>
+          <select id="pts-staff-select"><option value="">Select staff…</option></select>
+        </div>
+        <div class="form-group">
+          <label>Points to Add (or subtract with negative number)</label>
+          <input type="number" id="pts-amount" placeholder="e.g. 10" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--gray);font-size:0.9rem;">
+        </div>
+        <div class="form-group">
+          <label>Reason (optional)</label>
+          <input type="text" id="pts-reason" placeholder="e.g. Perfect attendance this week">
+        </div>
+        <button class="btn btn-primary" onclick="updateStaffPoints()">Update Points</button>
+        <div id="pts-update-msg" style="margin-top:10px;font-size:0.85rem;color:var(--green);"></div>
+        <div class="card-title" style="margin:20px 0 12px;"><span class="dot" style="background:var(--blue)"></span>Current Points Leaderboard</div>
+        <div id="pts-leaderboard" style="font-size:0.88rem;"></div>
+      </div>
+      <!-- Config -->
+      <div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:12px;"><span class="dot" style="background:var(--blue)"></span>How to Earn Points</div>
+          <textarea id="pts-how-to-earn" rows="6" placeholder="Describe how staff can earn points…" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--gray);font-size:0.88rem;font-family:inherit;resize:vertical;"></textarea>
+          <button class="btn btn-primary" style="margin-top:10px;" onclick="savePointsConfig()">Save</button>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:12px;"><span class="dot" style="background:var(--coral)"></span>Prize Exchange</div>
+          <textarea id="pts-prizes" rows="6" placeholder="List what prizes can be earned and how many points each costs…" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--gray);font-size:0.88rem;font-family:inherit;resize:vertical;"></textarea>
+          <button class="btn btn-primary" style="margin-top:10px;" onclick="savePointsConfig()">Save</button>
+        </div>
       </div>
     </div>
   </section>
@@ -882,8 +925,119 @@ function showPage(id) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(id === 'coverage-mgmt') fetchAdminCoverage();
   if(id === 'dashboard') renderDashboard();
+  if(id === 'points-mgmt') loadPointsMgmt();
   document.getElementById('page-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
+}
+
+// ===================== POINTS MANAGEMENT =====================
+async function loadPointsMgmt() {
+  // Populate staff dropdown
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_names?order=name.asc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const names = await res.json();
+    const sel = document.getElementById('pts-staff-select');
+    sel.innerHTML = '<option value="">Select staff…</option>';
+    if (Array.isArray(names)) {
+      names.forEach(n => {
+        const o = document.createElement('option');
+        o.value = n.name; o.textContent = n.name;
+        sel.appendChild(o);
+      });
+    }
+  } catch(e) { console.error(e); }
+
+  // Load leaderboard
+  await refreshPointsLeaderboard();
+
+  // Load config
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/points_config?id=eq.main`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const cfg = await res.json();
+    if (cfg && cfg[0]) {
+      document.getElementById('pts-how-to-earn').value = cfg[0].how_to_earn || '';
+      document.getElementById('pts-prizes').value = cfg[0].prizes || '';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function refreshPointsLeaderboard() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_points?order=points.desc`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const rows = await res.json();
+    const lb = document.getElementById('pts-leaderboard');
+    if (!Array.isArray(rows) || rows.length === 0) {
+      lb.innerHTML = '<div style="color:var(--muted);">No points recorded yet.</div>';
+      return;
+    }
+    lb.innerHTML = rows.map((r, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray);">
+        <span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'•'} ${r.staff_name}</span>
+        <strong style="color:var(--blue-dark);">${r.points} pts</strong>
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function updateStaffPoints() {
+  const name = document.getElementById('pts-staff-select').value;
+  const amount = parseInt(document.getElementById('pts-amount').value);
+  const msg = document.getElementById('pts-update-msg');
+  if (!name) { msg.style.color='var(--coral)'; msg.textContent='Please select a staff member.'; return; }
+  if (isNaN(amount)) { msg.style.color='var(--coral)'; msg.textContent='Please enter a number.'; return; }
+
+  try {
+    // Get current points
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/staff_points?staff_name=eq.${encodeURIComponent(name)}`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const existing = await res.json();
+    const currentPts = (existing && existing[0]) ? existing[0].points : 0;
+    const newPts = Math.max(0, currentPts + amount);
+
+    if (existing && existing[0]) {
+      await fetch(`${SUPABASE_URL}/rest/v1/staff_points?staff_name=eq.${encodeURIComponent(name)}`, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ points: newPts })
+      });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/staff_points`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ staff_name: name, points: newPts })
+      });
+    }
+
+    msg.style.color='var(--green)';
+    msg.textContent = `✓ ${name} now has ${newPts} points (${amount >= 0 ? '+' : ''}${amount})`;
+    document.getElementById('pts-amount').value = '';
+    document.getElementById('pts-reason').value = '';
+    await refreshPointsLeaderboard();
+  } catch(e) {
+    msg.style.color='var(--coral)';
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+async function savePointsConfig() {
+  const how = document.getElementById('pts-how-to-earn').value;
+  const prizes = document.getElementById('pts-prizes').value;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/points_config`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ id: 'main', how_to_earn: how, prizes })
+    });
+    showToast('Points settings saved ✓');
+  } catch(e) {
+    showToast('Error saving: ' + e.message, true);
+  }
 }
 
 // ===================== MODALS =====================
