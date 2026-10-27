@@ -2341,7 +2341,8 @@ function init() {
         fetchTodaysChanges(),
         fetchWeeklySchedule(),
         fetchAssignmentsFromSupabase(),
-        fetchStaffFromSupabase()
+        fetchStaffFromSupabase(),
+        loadPoints()
       ]);
     } catch(e) {}
     if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = ''; btn.textContent = '🔄'; }
