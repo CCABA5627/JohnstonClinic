@@ -894,16 +894,8 @@ const DEFAULT_STAFF = [
   }},
 ];
 
-const DEFAULT_SHOUTOUTS_CLIENT = [
-  { name: 'Alex R.', staff: 'Mia Torres', program: 'Independent Requesting', note: 'Used PECS to request a preferred item 3 times independently today — a huge milestone after weeks of practice! 🎉', date: 'June 20' },
-  { name: 'Emma S.', staff: 'Riley Chen', program: 'Joint Attention', note: 'Emma made eye contact AND pointed to share a book with her RBT today. Her social engagement is blossoming! 🌱', date: 'June 19' },
-  { name: 'Noah P.', staff: 'Avery Kim', program: 'Transition Tolerance', note: 'Noah transitioned from preferred to non-preferred activity with ZERO meltdowns all week. Incredible progress!', date: 'June 18' },
-];
-
-const DEFAULT_SHOUTOUTS_STAFF = [
-  { from: 'Dr. Sarah Mitchell (BCBA)', to: 'Jordan Lee', note: 'Jordan went above and beyond this week — staying late to help prep materials and showing exceptional patience with a challenging session. We are so lucky to have you! 🌟', date: 'June 21' },
-  { from: 'Leadership Team', to: 'Casey Park', note: "Casey's data collection has been immaculate this month. Your consistency makes our whole clinical team stronger. Thank you! 💪", date: 'June 17' },
-];
+const DEFAULT_SHOUTOUTS_CLIENT = [];
+const DEFAULT_SHOUTOUTS_STAFF = [];
 
 const DEFAULT_TRAINING = [];
 
@@ -2301,8 +2293,8 @@ async function fetchShoutoutsFromSupabase() {
       fetch(`${SUPABASE_URL}/rest/v1/shoutouts_client?order=created_at.desc`, SB).then(r=>r.json()),
       fetch(`${SUPABASE_URL}/rest/v1/shoutouts_staff?order=created_at.desc`, SB).then(r=>r.json())
     ]);
-    if (Array.isArray(cs) && cs.length) shoutoutsClient = cs.map(r=>({ name:r.name, staff:r.staff, program:r.program, note:r.note, date:r.shoutout_date }));
-    if (Array.isArray(ss) && ss.length) shoutoutsStaff = ss.map(r=>({ to:r.recipient, from:r.from_person, note:r.note, date:r.shoutout_date }));
+    if (Array.isArray(cs)) shoutoutsClient = cs.map(r=>({ name:r.name, staff:r.staff, program:r.program, note:r.note, date:r.shoutout_date }));
+    if (Array.isArray(ss)) shoutoutsStaff = ss.map(r=>({ to:r.recipient, from:r.from_person, note:r.note, date:r.shoutout_date }));
     renderShoutouts();
   } catch(e) {}
 }
