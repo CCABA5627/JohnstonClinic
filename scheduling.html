@@ -1272,7 +1272,8 @@ function computeWeeklyChanges(weekOff){
       const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
       const hasNoPermanentRole=!isPermanentForClient;
       const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
-      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+      const isExplicitOverride=bl.staffOverridden&&bl.staffId!==permStaffId;
+      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled||isExplicitOverride)&&!isStaffOut(bl.staffId)){
         const key=bl.staffId+'|'+bl.client.id;
         if(!seenSubs.has(key)){seenSubs.add(key);const permName=permStaffId?gsN(permStaffId)?.name:null;items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:sub.name+' covering '+c.name,sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'-'+bl.to});}
       }
@@ -1329,7 +1330,9 @@ function computePortalChanges(){
       const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
       const hasNoPermanentRole=!isPermanentForClient;
       const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
-      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+      // Also catch: explicit staff override where original was called out (permStaffId exists but was called out)
+      const isExplicitOverride=bl.staffOverridden&&bl.staffId!==permStaffId;
+      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled||isExplicitOverride)&&!isStaffOut(bl.staffId)){
         const key=bl.staffId+'|'+c.id;
         if(!seenSubs.has(key)){seenSubs.add(key);items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:sub.name+' covering '+c.name,sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'-'+bl.to});}
       }

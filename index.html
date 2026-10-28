@@ -2048,6 +2048,53 @@ async function fetchWeeklySchedule() {
       return;
     }
 
+    // Apply callouts and staffOverrides from cachedScheduleState to current-week data
+    if (cachedScheduleState) {
+      const todayIso = new Date().toISOString().slice(0,10);
+      const todayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+
+      // Staff called out today (by name, since staff_schedules uses names)
+      const calledOutNames = new Set();
+      (cachedScheduleState.calledOut || []).forEach(co => {
+        if (!co.date || co.date === todayIso) {
+          const s = (cachedScheduleState.staff || []).find(st => st.id === co.sid);
+          if (s) calledOutNames.add(s.name);
+        }
+      });
+
+      // staffOverrides for today: build map clientName|startTime -> new staff name
+      const overrideMap = {};
+      const staffById = {};
+      (cachedScheduleState.staff || []).forEach(s => { staffById[s.id] = s; });
+      const clientsById = {};
+      (cachedScheduleState.clients || []).forEach(c => { clientsById[c.id] = c; });
+      Object.entries(cachedScheduleState.staffOverrides || {}).forEach(([cid, ovList]) => {
+        if (!Array.isArray(ovList)) return;
+        const client = clientsById[cid];
+        if (!client) return;
+        ovList.forEach(ov => {
+          if (ov.day !== todayName || ov.date !== todayIso) return;
+          const blk = (client.schedule[ov.day] || [])[parseInt(ov.blockIdx, 10)];
+          if (!blk) return;
+          const key = (client.name || '') + '|' + blk.from;
+          overrideMap[key] = ov.staffId ? (staffById[ov.staffId]?.name || null) : null;
+        });
+      });
+
+      data.forEach(r => {
+        const key = (r.client_name || '') + '|' + (r.start_time || '');
+        if (key in overrideMap) {
+          r.staff_name = overrideMap[key];
+          r._overridden = true;
+        }
+        // If assigned staff is called out today, show as unassigned
+        if (r.staff_name && calledOutNames.has(r.staff_name) && r.day === todayName) {
+          r.staff_name = null;
+          r._overridden = true;
+        }
+      });
+    }
+
     renderWeeklyGrid(data, bodyEl, statusEl, timeEl);
 
   } catch(e) {
