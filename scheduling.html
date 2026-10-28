@@ -538,22 +538,25 @@ S.selDaysS=initSDS(S.staff);
 // staffOverrides:  {cid: [{blockIdx, day, staffId, date}]}   — today-only per-block STAFF overrides (substitutions)
 // Neither ever touches c.schedule — the clients tab is the permanent source of truth.
 function todayISO(){return new Date().toISOString().slice(0,10);}
-function getEffectiveBlocks(cid, day){
+function getEffectiveBlocks(cid, day, viewIso){
+  // viewIso: optional — the ISO date of this day in the week being rendered.
+  // If omitted, defaults to todayISO() (current-day overrides only).
   const c=gcN(cid); if(!c) return [];
   const blocks=c.schedule[day]||[];
   const iso=todayISO();
-  // Time overrides (today-only schedule adjustments)
+  const matchIso=viewIso||iso; // ISO to match overrides against
+  // Time overrides
   const rawOvList=S.clientOverrides[cid];
   const ovList=Array.isArray(rawOvList)?rawOvList:[];
-  const activeOvs=ovList.filter(o=>o.date?o.date===iso&&o.day===day:o.day===day);
-  // Staff overrides (today-only substitutions assigned through callout coverage)
+  const activeOvs=ovList.filter(o=>o.date?o.date===matchIso&&o.day===day:o.day===day);
+  // Staff overrides — match either today's overrides (for current-day) or date-specific future overrides
   const rawStOvList=S.staffOverrides[cid];
   const stOvList=Array.isArray(rawStOvList)?rawStOvList:[];
-  const activeStOvs=stOvList.filter(o=>o.date===iso&&o.day===day);
-  // Split overrides (today-only partial coverage splits)
+  const activeStOvs=stOvList.filter(o=>o.date===matchIso&&o.day===day);
+  // Split overrides
   const rawSpOvList=S.splitOverrides[cid];
   const spOvList=Array.isArray(rawSpOvList)?rawSpOvList:[];
-  const activeSpOvs=spOvList.filter(o=>o.date===iso&&o.day===day);
+  const activeSpOvs=spOvList.filter(o=>o.date===matchIso&&o.day===day);
   const todayCount=(S.clientOverrideCounts?.[cid])||blocks.length;
   const count=Math.max(blocks.length,activeOvs.length>0?todayCount:blocks.length);
   return Array.from({length:count},(_,idx)=>{
@@ -646,10 +649,11 @@ window._BM={};
 function regBlock(key,data){window._BM[key]=data;return key;}
 function openBlock(key){const d=window._BM[key];if(d)openAssignModal(d.cid,d.day,d.blockIdx,d.isTemp,d.tempId);}
 
-function openAssignModal(cid,day,blockIdx,isTemp,tempId){
+function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   const c=gcN(cid);let blockFrom,blockTo,currentSid,slots,blk;
+  if(!targetDate)targetDate=isoForDay(day,S.weekOffset||0)||todayISO();
   if(isTemp){blk=S.tempBlocks.find(t=>t.id===tempId);if(!blk)return;blockFrom=blk.slots[0];blockTo=blk.slots[blk.slots.length-1];currentSid=blk.staffId;slots=blk.slots;}
-  else{blk=(c?.schedule[day]||[])[blockIdx];if(!blk)return;blockFrom=blk.from;blockTo=blk.to;const effBlk=getEffectiveBlocks(cid,day)[blockIdx];currentSid=effBlk?effBlk.staffId:blk.staffId;slots=slotsInBlock(blk.from,blk.to);
+  else{blk=(c?.schedule[day]||[])[blockIdx];if(!blk)return;blockFrom=blk.from;blockTo=blk.to;const effBlk=getEffectiveBlocks(cid,day,targetDate)[blockIdx];currentSid=effBlk?effBlk.staffId:blk.staffId;slots=slotsInBlock(blk.from,blk.to);
     // Use effective block's splits (today-only overrides take precedence over permanent block)
     if(effBlk&&effBlk.splits!==undefined)blk={...blk,splits:effBlk.splits,staffId:effBlk.staffId};
   }
@@ -783,8 +787,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId){
   function staffRow(sid,subText,isCur,hasConflict,note,extraStyle,mode){
     const s=gsN(sid);
     const assignFn=mode==='partial'
-      ?`doAssignPartial('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}')`
-      :`doAssign('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}')`;
+      ?`doAssignPartial('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}','${targetDate}')`
+      :`doAssign('${cid}','${day}',${isTemp?-1:blockIdx},'${sid}','${tempId||''}','${targetDate}')`;
     // Build today's schedule display
     const todaySched=getStaffTodaySchedule(sid);
     let schedHtml='';
@@ -855,24 +859,19 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId){
           <div class="av av-s" style="width:22px;height:22px;font-size:8px">${ini(gsN(sp.sid)?.name||'?')}</div>
           <span style="font-size:12px;font-weight:500;flex:1">${gsN(sp.sid)?.name}${coNote}</span>
           <span style="font-size:11px;color:#085041">${sp.from} – ${sp.to}</span>
-          <button onclick="removeSplit('${cid}','${day}',${isTemp?-1:blockIdx},'${sp.sid}','${tempId||''}')" style="background:none;border:none;color:#D85A30;cursor:pointer;font-size:14px;padding:0 2px;">×</button>
+          <button onclick="removeSplit('${cid}','${day}',${isTemp?-1:blockIdx},'${sp.sid}','${tempId||''}','${targetDate}')" style="background:none;border:none;color:#D85A30;cursor:pointer;font-size:14px;padding:0 2px;">×</button>
         </div>`;
       }).join('')}
       ${uncoveredDesc}
-      <button class="unassign-btn" style="margin-top:8px;" onclick="clearAllSplits('${cid}','${day}',${isTemp?-1:blockIdx},'${tempId||''}')">Clear all assignments</button>
+      <button class="unassign-btn" style="margin-top:8px;" onclick="clearAllSplits('${cid}','${day}',${isTemp?-1:blockIdx},'${tempId||''}','${targetDate}')">Clear all assignments</button>
     </div>`;
   }
 
-  // Remove assignment button — only show when there's a today-only override active
+  // Remove assignment button — show whenever there's a current staff (permanent or override)
   let removeBtn='';
-  const hasTodayOverride=!isTemp&&(()=>{
-    const iso2=todayISO();
-    const hasStOv=(S.staffOverrides[cid]||[]).some(o=>parseInt(o.blockIdx,10)===blockIdx&&o.day===day&&o.date===iso2);
-    const hasSpOv=(S.splitOverrides[cid]||[]).some(o=>parseInt(o.blockIdx,10)===blockIdx&&o.day===day&&o.date===iso2);
-    return hasStOv||hasSpOv;
-  })();
-  if(isTemp||(currentSid&&hasTodayOverride)){
-    removeBtn=`<button class="unassign-btn" style="margin-bottom:8px;" onclick="doAssign('${cid}','${day}',${isTemp?-1:blockIdx},null,'${tempId||''}')">✕ Remove assignment</button>`;
+  if(isTemp||(currentSid&&!isTemp)){
+    const removeLabel=isTemp?'✕ Remove assignment':'✕ Remove for this date only';
+    removeBtn=`<button class="unassign-btn" style="margin-bottom:8px;" onclick="doAssign('${cid}','${day}',${isTemp?-1:blockIdx},null,'${tempId||''}','${targetDate}')">` + removeLabel + `</button>`;
   }
   if(isTemp){
     removeBtn+=`<button class="unassign-btn" style="color:#534AB7;border-color:#534AB7;margin-bottom:8px;margin-top:${currentSid?'4':'0'}px;" onclick="deleteTempBlock('${tempId}')">🗑 Delete this temp block</button>`;
@@ -950,19 +949,21 @@ function getBlk(cid,day,blockIdx,tempId){
 }
 
 // Add or replace a staff member's coverage on a block for specific slots
-function doAssign(cid,day,blockIdx,newSid,tempId){
+function doAssign(cid,day,blockIdx,newSid,tempId,targetDate){
+  if(!targetDate)targetDate=isoForDay(day,S.weekOffset||0)||todayISO();
   if(tempId){
-    // Temp blocks are already today-only — safe to write directly
+    // Temp blocks are already day-specific — safe to write directly
     const blk=getBlk(cid,day,blockIdx,tempId);
     if(!blk)return;
     blk.staffId=newSid||null;blk.splits=null;
   } else {
-    // Regular block — store as a today-only staff override, never touch c.schedule
-    const iso=todayISO();
+    // Regular block — store as a date-specific staff override, never touch c.schedule
+    const iso=targetDate;
     const bi=parseInt(blockIdx,10);
     if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
     S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&parseInt(o.blockIdx,10)===bi&&o.date===iso));
-    if(newSid) S.staffOverrides[cid].push({day,blockIdx:bi,staffId:newSid,date:iso});
+    // Always push override — null staffId means "removed for this date"
+    S.staffOverrides[cid].push({day,blockIdx:bi,staffId:newSid||null,date:iso});
     // Also clear any split overrides for this block when removing/reassigning
     if(S.splitOverrides[cid]){
       S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
@@ -972,17 +973,23 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
     if(permBlk2&&permBlk2.splits){permBlk2.splits=null;}
     const permStaff=gcN(cid)?.schedule[day]?.[blockIdx]?.staffId;
     const subName=gsN(newSid)?.name;const permName=gsN(permStaff)?.name;
-    showToast((subName||'Staff')+' assigned for today only'+(permName?' (normally: '+permName+')':''),false);
+    const dateLabel=iso===todayISO()?'today only':iso;
+    if(newSid){
+      showToast((subName||'Staff')+' assigned for '+dateLabel+(permName?' (normally: '+permName+')':''),false);
+    } else {
+      showToast('Assignment removed for '+dateLabel+(permName?' (normally: '+permName+')':''),false);
+    }
   }
   markDirty();closeModal();render();
 }
 
 // Assign a staff member to cover only the uncovered slots they're available for
-function doAssignPartial(cid,day,blockIdx,newSid,tempId){
+function doAssignPartial(cid,day,blockIdx,newSid,tempId,targetDate){
+  if(!targetDate)targetDate=isoForDay(day,S.weekOffset||0)||todayISO();
   const blk=getBlk(cid,day,blockIdx,tempId);
   if(!blk)return;
   const blockSlots=blk.slots||slotsInBlock(blk.from,blk.to);
-  const iso=todayISO();
+  const iso=targetDate;
 
   if(tempId){
     // Temp blocks write directly (already today-only)
@@ -1003,12 +1010,12 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
     blk.splits.sort((a,b)=>t2m(a.from)-t2m(b.from));
     blk.staffId=blk.splits[0].sid;
     markDirty();
-    openAssignModal(cid,day,blockIdx,true,tempId);
+    openAssignModal(cid,day,blockIdx,true,tempId,targetDate);
     render();
     return;
   }
 
-  // Regular block — use splitOverrides (today-only, never touch c.schedule)
+  // Regular block — use splitOverrides (date-specific, never touch c.schedule)
   if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
   const bi=parseInt(blockIdx,10);
   // Get existing split override for this block (if any), or start from the permanent block's state
@@ -1058,23 +1065,24 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
   S.splitOverrides[cid].push({day,blockIdx:bi,date:iso,splits:currentSplits});
 
   markDirty();
-  openAssignModal(cid,day,blockIdx,false,null);
+  openAssignModal(cid,day,blockIdx,false,null,targetDate);
   render();
 }
 
-function removeSplit(cid,day,blockIdx,sid,tempId){
+function removeSplit(cid,day,blockIdx,sid,tempId,targetDate){
+  if(!targetDate)targetDate=isoForDay(day,S.weekOffset||0)||todayISO();
   if(tempId){
     const blk=getBlk(cid,day,blockIdx,tempId);
     if(!blk)return;
     if(blk.splits){blk.splits=blk.splits.filter(sp=>sp.sid!==sid);if(!blk.splits.length)blk.splits=null;}
     blk.staffId=blk.splits?.[0]?.sid||null;
     markDirty();
-    renderAssignModalBody(cid,day,blockIdx,tempId,blk);
+    renderAssignModalBody(cid,day,blockIdx,tempId,blk,targetDate);
     render();
     return;
   }
   // Regular block — update splitOverrides
-  const iso=todayISO();
+  const iso=targetDate;
   const bi=parseInt(blockIdx,10);
   if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
   const existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===bi&&o.date===iso);
@@ -1085,19 +1093,20 @@ function removeSplit(cid,day,blockIdx,sid,tempId){
   }
   markDirty();
   // Re-read effective block to show updated modal
-  const effBlks=getEffectiveBlocks(cid,day);
+  const effBlks=getEffectiveBlocks(cid,day,targetDate);
   const effBlk=effBlks[blockIdx];
-  if(effBlk)renderAssignModalBody(cid,day,blockIdx,false,effBlk);
+  if(effBlk)renderAssignModalBody(cid,day,blockIdx,false,effBlk,targetDate);
   render();
 }
 
-function clearAllSplits(cid,day,blockIdx,tempId){
+function clearAllSplits(cid,day,blockIdx,tempId,targetDate){
+  if(!targetDate)targetDate=isoForDay(day,S.weekOffset||0)||todayISO();
   if(tempId){
     const blk=getBlk(cid,day,blockIdx,tempId);
     if(!blk)return;
     blk.staffId=null;blk.splits=null;
   } else {
-    const iso=todayISO();
+    const iso=targetDate;
     const bi=parseInt(blockIdx,10);
     // Clear split overrides for this block
     if(S.splitOverrides[cid]){
@@ -1115,11 +1124,11 @@ function clearAllSplits(cid,day,blockIdx,tempId){
 }
 
 // Render just the modal body (used when updating splits without closing modal)
-function renderAssignModalBody(cid,day,blockIdx,tempId,blk){
+function renderAssignModalBody(cid,day,blockIdx,tempId,blk,targetDate){
   const existing=document.getElementById('modal-body');
   if(!existing)return;
   // Re-open the modal with updated state
-  openAssignModal(cid,day,blockIdx,blk?.isTemp||!!tempId,tempId);
+  openAssignModal(cid,day,blockIdx,blk?.isTemp||!!tempId,tempId,targetDate);
 }
 function deleteTempBlock(id){S.tempBlocks=S.tempBlocks.filter(t=>t.id!==id);markDirty();closeModal();render();}
 
@@ -1401,7 +1410,7 @@ function bestForSlot(cid,day,slot,excl){const pod=S.pods[cid]||[];const res=[];p
 function todayDay(){const d=ALL_DAYS[new Date().getDay()];return DAYS.includes(d)?d:DAYS[0];}
 function go(t){S.tab=t;document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));render();}
 function fmtBlock(blk){return blk.from+(blk.from!==blk.to?' \u2013 '+blk.to:'');}
-function getDayBlocks(day){const out=[];S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
+function getDayBlocks(day,viewIso){const out=[];S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
 out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:S.calledOutClients.includes(tb.cid)});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
 
 function getPartialGaps(bl,day){
@@ -1790,7 +1799,7 @@ function fmtWeekDate(dt){return (dt.getMonth()+1)+'/'+(dt.getDate());}
 function rWeek(){
   const offset=S.weekOffset||0;
   const weekDates=getWeekDates(offset);
-  const byDay={};DAYS.forEach(d=>byDay[d]=getDayBlocks(d));
+  const byDay={};DAYS.forEach(d=>byDay[d]=getDayBlocks(d,isoForDay(d,offset)));
   const total=Object.values(byDay).reduce((s,a)=>s+a.length,0);
   const cov=Object.values(byDay).reduce((s,a)=>s+a.filter(x=>x.staffId&&!isStaffOut(x.staffId)).length,0);
   const todayDayStr=todayDay();
