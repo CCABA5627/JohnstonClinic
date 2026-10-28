@@ -996,8 +996,7 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
     const coverSlots=remaining.length?remaining:blockSlots;
     if(!coverSlots.length)return;
     const from=coverSlots[0];
-    const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
-    const to=TIMES[lastIdx+1]||blk.to;
+    const to=coverSlots[coverSlots.length-1];
     if(!blk.splits)blk.splits=[];
     blk.splits=blk.splits.filter(sp=>sp.sid!==newSid);
     blk.splits.push({sid:newSid,from,to});
@@ -1029,8 +1028,9 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
     const existSlots=existAv.size?blockSlots.filter(sl=>existAv.has(sl)):[];
     if(existSlots.length){
       const ef=existSlots[0];
-      const elIdx=TIMES.indexOf(existSlots[existSlots.length-1]);
-      const et=TIMES[elIdx+1]||blk.to;
+      // Availability slots are end-times: "2:00 PM" means "available until 2:00 PM"
+      // so the last slot IS the to-time, not lastSlot+15min
+      const et=existSlots[existSlots.length-1];
       currentSplits.push({sid:blk.staffId,from:ef,to:et});
       existSlots.forEach(sl=>coveredSlots.add(sl));
     }
@@ -1045,8 +1045,8 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
   const coverSlots=newStaffAv.size?pool.filter(sl=>newStaffAv.has(sl)):pool;
   if(!coverSlots.length)return;
   const from=coverSlots[0];
-  const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
-  const to=TIMES[lastIdx+1]||blk.to;
+  // Availability slots are end-times: "2:00 PM" means "available until 2:00 PM"
+  const to=coverSlots[coverSlots.length-1];
 
   // Update splits
   currentSplits=currentSplits.filter(sp=>sp.sid!==newSid);
