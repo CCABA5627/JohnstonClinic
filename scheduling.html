@@ -531,7 +531,7 @@ const DD={
 function slotsInBlock(from,to){const lo=t2m(from),hi=t2m(to);if(lo===hi)return TIMES.filter(t=>t2m(t)===lo);return TIMES.filter(t=>t2m(t)>=lo&&t2m(t)<hi);}
 function initSDS(st){const sd={};st.forEach(s=>{sd[s.id]=new Set(Object.keys(s.availability).filter(d=>DAYS.includes(d)));});return sd;}
 
-let S={tab:'today',...JSON.parse(JSON.stringify(DD)),selClient:'c1',selStaff:'s1',calloutStaff:null,calloutClient:null,calledOut:[],calledOutClients:[],clientOverrides:{},clientOverrideCounts:{},staffOverrides:{},acknowledgedChanges:{},todayFilter:'all',calloutMode:'staff',edTab:'clients',expEdit:null,dirty:false,lastSaved:null,podView:'clients',selPodClient:null,selPodStaff:null,aiKey:'',aiMessages:[],aiLoading:false,selectedDay:null,eventLog:[],reportMonth:null};
+let S={tab:'today',...JSON.parse(JSON.stringify(DD)),selClient:'c1',selStaff:'s1',calloutStaff:null,calloutClient:null,calledOut:[],calledOutClients:[],clientOverrides:{},clientOverrideCounts:{},staffOverrides:{},splitOverrides:{},acknowledgedChanges:{},todayFilter:'all',calloutMode:'staff',edTab:'clients',expEdit:null,dirty:false,lastSaved:null,podView:'clients',selPodClient:null,selPodStaff:null,aiKey:'',aiMessages:[],aiLoading:false,selectedDay:null,eventLog:[],reportMonth:null};
 S.selDaysS=initSDS(S.staff);
 
 // clientOverrides: {cid: [{blockIdx, day, from, to, date}]} — today-only per-block TIME overrides
@@ -550,15 +550,21 @@ function getEffectiveBlocks(cid, day){
   const rawStOvList=S.staffOverrides[cid];
   const stOvList=Array.isArray(rawStOvList)?rawStOvList:[];
   const activeStOvs=stOvList.filter(o=>o.date===iso&&o.day===day);
+  // Split overrides (today-only partial coverage splits)
+  const rawSpOvList=S.splitOverrides[cid];
+  const spOvList=Array.isArray(rawSpOvList)?rawSpOvList:[];
+  const activeSpOvs=spOvList.filter(o=>o.date===iso&&o.day===day);
   const todayCount=(S.clientOverrideCounts?.[cid])||blocks.length;
   const count=Math.max(blocks.length,activeOvs.length>0?todayCount:blocks.length);
   return Array.from({length:count},(_,idx)=>{
     const blk=blocks[idx]||{from:'',to:'',staffId:null,splits:null};
     const ov=activeOvs.find(o=>o.blockIdx===idx);
     const stOv=activeStOvs.find(o=>o.blockIdx===idx);
+    const spOv=activeSpOvs.find(o=>o.blockIdx===idx);
     let result={...blk};
     if(ov) result={...result,from:ov.from,to:ov.to,_overridden:true,_origFrom:blk.from,_origTo:blk.to};
     if(stOv) result={...result,staffId:stOv.staffId,splits:null,_staffOverridden:true,_origStaffId:blk.staffId};
+    if(spOv) result={...result,splits:spOv.splits,staffId:spOv.splits[0]?.sid||result.staffId,_splitOverridden:true};
     return result;
   }).filter(blk=>blk.from&&blk.to);
 }
@@ -643,7 +649,10 @@ function openBlock(key){const d=window._BM[key];if(d)openAssignModal(d.cid,d.day
 function openAssignModal(cid,day,blockIdx,isTemp,tempId){
   const c=gcN(cid);let blockFrom,blockTo,currentSid,slots,blk;
   if(isTemp){blk=S.tempBlocks.find(t=>t.id===tempId);if(!blk)return;blockFrom=blk.slots[0];blockTo=blk.slots[blk.slots.length-1];currentSid=blk.staffId;slots=blk.slots;}
-  else{blk=(c?.schedule[day]||[])[blockIdx];if(!blk)return;blockFrom=blk.from;blockTo=blk.to;const effBlk=getEffectiveBlocks(cid,day)[blockIdx];currentSid=effBlk?effBlk.staffId:blk.staffId;slots=slotsInBlock(blk.from,blk.to);}
+  else{blk=(c?.schedule[day]||[])[blockIdx];if(!blk)return;blockFrom=blk.from;blockTo=blk.to;const effBlk=getEffectiveBlocks(cid,day)[blockIdx];currentSid=effBlk?effBlk.staffId:blk.staffId;slots=slotsInBlock(blk.from,blk.to);
+    // Use effective block's splits (today-only overrides take precedence over permanent block)
+    if(effBlk&&effBlk.splits!==undefined)blk={...blk,splits:effBlk.splits,staffId:effBlk.staffId};
+  }
   const range=blockFrom+(blockFrom!==blockTo?' \u2013 '+blockTo:'');
   document.getElementById('modal-title-text').textContent=(c?.name||'?')+' \u00b7 '+day+' '+range;
   const pod=S.pods[cid]||[];
@@ -959,63 +968,120 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
   const blk=getBlk(cid,day,blockIdx,tempId);
   if(!blk)return;
   const blockSlots=blk.slots||slotsInBlock(blk.from,blk.to);
-  // Find already covered slots from existing splits
-  const coveredSlots=new Set();
-  if(blk.splits){
-    blk.splits.filter(sp=>sp.sid!==newSid).forEach(sp=>
-      slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl))coveredSlots.add(sl);})
-    );
-  } else if(blk.staffId&&blk.staffId!==newSid){
-    const pav=new Set(gsN(blk.staffId)?.availability[day]||[]);
-    blockSlots.forEach(sl=>{if(pav.has(sl))coveredSlots.add(sl);});
+  const iso=todayISO();
+
+  if(tempId){
+    // Temp blocks write directly (already today-only)
+    const coveredSlots=new Set();
+    if(blk.splits){
+      blk.splits.filter(sp=>sp.sid!==newSid).forEach(sp=>
+        slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl))coveredSlots.add(sl);})
+      );
+    }
+    const remaining=blockSlots.filter(sl=>!coveredSlots.has(sl));
+    const coverSlots=remaining.length?remaining:blockSlots;
+    if(!coverSlots.length)return;
+    const from=coverSlots[0];
+    const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
+    const to=TIMES[lastIdx+1]||blk.to;
+    if(!blk.splits)blk.splits=[];
+    blk.splits=blk.splits.filter(sp=>sp.sid!==newSid);
+    blk.splits.push({sid:newSid,from,to});
+    blk.splits.sort((a,b)=>t2m(a.from)-t2m(b.from));
+    blk.staffId=blk.splits[0].sid;
+    markDirty();
+    openAssignModal(cid,day,blockIdx,true,tempId);
+    render();
+    return;
   }
-  // Staff covers the uncovered slots (ignore availability for today-only coverage assignments)
+
+  // Regular block — use splitOverrides (today-only, never touch c.schedule)
+  if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
+  // Get existing split override for this block (if any), or start from the permanent block's state
+  let existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===blockIdx&&o.date===iso);
+  let currentSplits=existing?[...existing.splits]:(blk.splits?[...blk.splits]:[]);
+
+  // Find already covered slots from current splits
+  const coveredSlots=new Set();
+  currentSplits.filter(sp=>sp.sid!==newSid).forEach(sp=>
+    slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl))coveredSlots.add(sl);})
+  );
+
+  // If no splits yet and block has an original staff, give them the slots they're available for
+  // (or, if they have no availability set, we skip them — the gap will show correctly)
+  if(!currentSplits.length&&blk.staffId&&blk.staffId!==newSid){
+    const existAv=new Set(gsN(blk.staffId)?.availability[day]||[]);
+    const existSlots=existAv.size?blockSlots.filter(sl=>existAv.has(sl)):[];
+    if(existSlots.length){
+      const ef=existSlots[0];
+      const elIdx=TIMES.indexOf(existSlots[existSlots.length-1]);
+      const et=TIMES[elIdx+1]||blk.to;
+      currentSplits.push({sid:blk.staffId,from:ef,to:et});
+      existSlots.forEach(sl=>coveredSlots.add(sl));
+    }
+  }
+
+  // New staff covers the uncovered slots
   const remaining=blockSlots.filter(sl=>!coveredSlots.has(sl));
   const coverSlots=remaining.length?remaining:blockSlots;
   if(!coverSlots.length)return;
-  // Convert to time range
   const from=coverSlots[0];
   const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
   const to=TIMES[lastIdx+1]||blk.to;
-  // Build splits
-  if(!blk.splits){
-    // First split: existing staff covers their portion, new staff covers theirs
-    blk.splits=[];
-    if(blk.staffId){
-      const existAv=new Set(gsN(blk.staffId)?.availability[day]||[]);
-      const existSlots=blockSlots.filter(sl=>existAv.has(sl));
-      if(existSlots.length){
-        const ef=existSlots[0];
-        const elIdx=TIMES.indexOf(existSlots[existSlots.length-1]);
-        const et=TIMES[elIdx+1]||blk.to;
-        blk.splits.push({sid:blk.staffId,from:ef,to:et});
-      }
-    }
-  }
-  // Remove existing entry for this staff, add updated one
-  blk.splits=blk.splits.filter(sp=>sp.sid!==newSid);
-  blk.splits.push({sid:newSid,from,to});
-  blk.splits.sort((a,b)=>t2m(a.from)-t2m(b.from));
-  blk.staffId=blk.splits[0].sid;
+
+  // Update splits
+  currentSplits=currentSplits.filter(sp=>sp.sid!==newSid);
+  currentSplits.push({sid:newSid,from,to});
+  currentSplits.sort((a,b)=>t2m(a.from)-t2m(b.from));
+
+  // Save to splitOverrides (replacing any existing entry for this block)
+  S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+  S.splitOverrides[cid].push({day,blockIdx,date:iso,splits:currentSplits});
+
   markDirty();
-  openAssignModal(cid,day,blockIdx,!!tempId,tempId);
+  openAssignModal(cid,day,blockIdx,false,null);
   render();
 }
 
 function removeSplit(cid,day,blockIdx,sid,tempId){
-  const blk=getBlk(cid,day,blockIdx,tempId);
-  if(!blk)return;
-  if(blk.splits){blk.splits=blk.splits.filter(sp=>sp.sid!==sid);if(!blk.splits.length)blk.splits=null;}
-  blk.staffId=blk.splits?.[0]?.sid||null;
+  if(tempId){
+    const blk=getBlk(cid,day,blockIdx,tempId);
+    if(!blk)return;
+    if(blk.splits){blk.splits=blk.splits.filter(sp=>sp.sid!==sid);if(!blk.splits.length)blk.splits=null;}
+    blk.staffId=blk.splits?.[0]?.sid||null;
+    markDirty();
+    renderAssignModalBody(cid,day,blockIdx,tempId,blk);
+    render();
+    return;
+  }
+  // Regular block — update splitOverrides
+  const iso=todayISO();
+  if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
+  const existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===blockIdx&&o.date===iso);
+  if(!existing)return;
+  existing.splits=existing.splits.filter(sp=>sp.sid!==sid);
+  if(!existing.splits.length){
+    S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+  }
   markDirty();
-  renderAssignModalBody(cid,day,blockIdx,tempId,blk);
+  // Re-read effective block to show updated modal
+  const effBlks=getEffectiveBlocks(cid,day);
+  const effBlk=effBlks[blockIdx];
+  if(effBlk)renderAssignModalBody(cid,day,blockIdx,false,effBlk);
   render();
 }
 
 function clearAllSplits(cid,day,blockIdx,tempId){
-  const blk=getBlk(cid,day,blockIdx,tempId);
-  if(!blk)return;
-  blk.staffId=null;blk.splits=null;
+  if(tempId){
+    const blk=getBlk(cid,day,blockIdx,tempId);
+    if(!blk)return;
+    blk.staffId=null;blk.splits=null;
+  } else {
+    const iso=todayISO();
+    if(S.splitOverrides[cid]){
+      S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+    }
+  }
   markDirty();closeModal();render();
 }
 
@@ -1070,6 +1136,7 @@ function applyState(p){
   });
   S.clientOverrideCounts=p.clientOverrideCounts||{};
   S.staffOverrides=p.staffOverrides||{};
+  S.splitOverrides=p.splitOverrides||{};
   S.acknowledgedChanges=p.acknowledgedChanges||{};
   S.eventLog=p.eventLog||[];
   S.selClient=S.clients[0]?.id||null;
@@ -1257,7 +1324,7 @@ async function doSave(silent){
       color:ci.color,bg:ci.bg,border:ci.border
     }));
     const weeklyChanges=computeWeeklyChanges();
-    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,weeklyChanges:weeklyChanges,savedAt:new Date().toISOString()};
+    const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},splitOverrides:S.splitOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,weeklyChanges:weeklyChanges,savedAt:new Date().toISOString()};
     // Save to localStorage immediately as fast cache
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}
     // Save to Supabase
@@ -1283,7 +1350,7 @@ function updSI(status){const el=document.getElementById('si');if(!el)return;if(s
 function showToast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(()=>t.style.display='none',2800);}
 function exportJSON(){const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,exportedAt:new Date().toISOString()};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='ccaba-scheduling-backup.json';a.click();URL.revokeObjectURL(u);showToast('Backup downloaded',false);}
 function importJSON(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const p=JSON.parse(ev.target.result);if(!p.clients||!p.staff)throw 0;S.clients=p.clients;S.staff=p.staff;S.pods=p.pods||{};S.tempBlocks=p.tempBlocks||[];S.selClient=S.clients[0]?.id||null;S.selStaff=S.staff[0]?.id||null;S.calledOut=[];S.selDaysS=initSDS(S.staff);markDirty();render();showToast('Imported — saving to cloud…',false);}catch(e){showToast('Invalid file',true);}};r.readAsText(f);};i.click();}
-function resetData(){if(!confirm('Reset ALL data to sample defaults? This will clear the cloud too.'))return;const f=JSON.parse(JSON.stringify(DD));Object.assign(S,f);S.tempBlocks=[];S.selClient=S.clients[0]?.id;S.selStaff=S.staff[0]?.id;S.calledOut=[];S.calledOutClients=[];S.clientOverrides={};S.staffOverrides={};S.dirty=true;S.selDaysS=initSDS(S.staff);try{localStorage.removeItem(SK);}catch(e){}doSave(true);render();showToast('Reset to defaults',false);}
+function resetData(){if(!confirm('Reset ALL data to sample defaults? This will clear the cloud too.'))return;const f=JSON.parse(JSON.stringify(DD));Object.assign(S,f);S.tempBlocks=[];S.selClient=S.clients[0]?.id;S.selStaff=S.staff[0]?.id;S.calledOut=[];S.calledOutClients=[];S.clientOverrides={};S.staffOverrides={};S.splitOverrides={};S.dirty=true;S.selDaysS=initSDS(S.staff);try{localStorage.removeItem(SK);}catch(e){}doSave(true);render();showToast('Reset to defaults',false);}
 
 function ini(n){return n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);}
 function gcN(id){return S.clients.find(c=>c.id===id);}
