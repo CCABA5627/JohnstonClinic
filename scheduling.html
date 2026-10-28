@@ -560,7 +560,7 @@ function getEffectiveBlocks(cid, day){
     const blk=blocks[idx]||{from:'',to:'',staffId:null,splits:null};
     const ov=activeOvs.find(o=>o.blockIdx===idx);
     const stOv=activeStOvs.find(o=>o.blockIdx===idx);
-    const spOv=activeSpOvs.find(o=>o.blockIdx===idx);
+    const spOv=activeSpOvs.find(o=>parseInt(o.blockIdx,10)===idx);
     let result={...blk};
     if(ov) result={...result,from:ov.from,to:ov.to,_overridden:true,_origFrom:blk.from,_origTo:blk.to};
     if(stOv) result={...result,staffId:stOv.staffId,splits:null,_staffOverridden:true,_origStaffId:blk.staffId};
@@ -956,6 +956,11 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
     if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
     S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
     if(newSid) S.staffOverrides[cid].push({day,blockIdx,staffId:newSid,date:iso});
+    // Also clear any split overrides for this block when removing/reassigning
+    const bi=parseInt(blockIdx,10);
+    if(S.splitOverrides[cid]){
+      S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
+    }
     const permStaff=gcN(cid)?.schedule[day]?.[blockIdx]?.staffId;
     const subName=gsN(newSid)?.name;const permName=gsN(permStaff)?.name;
     showToast((subName||'Staff')+' assigned for today only'+(permName?' (normally: '+permName+')':''),false);
@@ -997,8 +1002,9 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
 
   // Regular block — use splitOverrides (today-only, never touch c.schedule)
   if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
+  const bi=parseInt(blockIdx,10);
   // Get existing split override for this block (if any), or start from the permanent block's state
-  let existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===blockIdx&&o.date===iso);
+  let existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===bi&&o.date===iso);
   let currentSplits=existing?[...existing.splits]:(blk.splits?[...blk.splits]:[]);
 
   // Find already covered slots from current splits
@@ -1035,8 +1041,8 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
   currentSplits.sort((a,b)=>t2m(a.from)-t2m(b.from));
 
   // Save to splitOverrides (replacing any existing entry for this block)
-  S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
-  S.splitOverrides[cid].push({day,blockIdx,date:iso,splits:currentSplits});
+  S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
+  S.splitOverrides[cid].push({day,blockIdx:bi,date:iso,splits:currentSplits});
 
   markDirty();
   openAssignModal(cid,day,blockIdx,false,null);
@@ -1056,12 +1062,13 @@ function removeSplit(cid,day,blockIdx,sid,tempId){
   }
   // Regular block — update splitOverrides
   const iso=todayISO();
+  const bi=parseInt(blockIdx,10);
   if(!S.splitOverrides[cid])S.splitOverrides[cid]=[];
-  const existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===blockIdx&&o.date===iso);
+  const existing=S.splitOverrides[cid].find(o=>o.day===day&&o.blockIdx===bi&&o.date===iso);
   if(!existing)return;
   existing.splits=existing.splits.filter(sp=>sp.sid!==sid);
   if(!existing.splits.length){
-    S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+    S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
   }
   markDirty();
   // Re-read effective block to show updated modal
@@ -1078,8 +1085,14 @@ function clearAllSplits(cid,day,blockIdx,tempId){
     blk.staffId=null;blk.splits=null;
   } else {
     const iso=todayISO();
+    const bi=parseInt(blockIdx,10);
+    // Clear split overrides for this block
     if(S.splitOverrides[cid]){
-      S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
+      S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
+    }
+    // Also clear any staff override for this block
+    if(S.staffOverrides[cid]){
+      S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
     }
   }
   markDirty();closeModal();render();
