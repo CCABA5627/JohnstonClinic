@@ -1036,9 +1036,13 @@ function doAssignPartial(cid,day,blockIdx,newSid,tempId){
     }
   }
 
-  // New staff covers the uncovered slots
+  // New staff covers the uncovered slots — limited to their availability
+  const newStaffAv=new Set(gsN(newSid)?.availability[day]||[]);
   const remaining=blockSlots.filter(sl=>!coveredSlots.has(sl));
-  const coverSlots=remaining.length?remaining:blockSlots;
+  const pool=remaining.length?remaining:blockSlots;
+  // If staff has availability set, only cover slots they're available for
+  // If no availability set at all, cover everything in pool (manual override)
+  const coverSlots=newStaffAv.size?pool.filter(sl=>newStaffAv.has(sl)):pool;
   if(!coverSlots.length)return;
   const from=coverSlots[0];
   const lastIdx=TIMES.indexOf(coverSlots[coverSlots.length-1]);
