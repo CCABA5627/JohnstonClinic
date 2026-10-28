@@ -1212,21 +1212,36 @@ function computePortalChanges(){
   // 4. Coverage substitutions
   const seenSubs=new Set();
   getDayBlocks(today).forEach(bl=>{
-    if(!bl.staffId||bl.isTemp)return;
+    if(bl.isTemp)return;
     const c=gcN(bl.client.id);if(!c)return;
-    const sub=gsN(bl.staffId);if(!sub)return;
     const permBlocks=c.schedule[today]||[];
     const permBlock=permBlocks[bl.blockIdx];
     const permStaffId=permBlock?.staffId||null;
-    const isPermanentForClient=permBlocks.some(pb=>pb.staffId===bl.staffId);
-    const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
-    const hasNoPermanentRole=!isPermanentForClient;
-    const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
-    if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
-      const key=bl.staffId+'|'+c.id;
-      if(!seenSubs.has(key)){seenSubs.add(key);const permName=permStaffId?gsN(permStaffId)?.name:null;items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:sub.name+' covering '+c.name,sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'-'+bl.to});}
+    const permName=permStaffId?gsN(permStaffId)?.name:null;
+    // Check splits first — each split person covering part of the block
+    if(bl.splits&&bl.splits.length){
+      bl.splits.forEach(sp=>{
+        const spSub=gsN(sp.sid);if(!spSub)return;
+        if(isStaffOut(sp.sid))return;
+        const spIsPerm=permBlocks.some(pb=>pb.staffId===sp.sid);
+        if(!spIsPerm){
+          const key=sp.sid+'|'+c.id;
+          if(!seenSubs.has(key)){seenSubs.add(key);items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:spSub.name+' covering '+c.name+' ('+sp.from+'-'+sp.to+')',sub:permName?'Usually: '+permName:'Not their regular client'});}
+        }
+      });
+    } else {
+      // Non-split block — check if the assigned staff is a sub
+      if(!bl.staffId)return;
+      const sub=gsN(bl.staffId);if(!sub)return;
+      const isPermanentForClient=permBlocks.some(pb=>pb.staffId===bl.staffId);
+      const isDifferentFromPerm=permStaffId&&permStaffId!==bl.staffId;
+      const hasNoPermanentRole=!isPermanentForClient;
+      const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
+      if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+        const key=bl.staffId+'|'+c.id;
+        if(!seenSubs.has(key)){seenSubs.add(key);items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:sub.name+' covering '+c.name,sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'-'+bl.to});}
+      }
     }
-    if(bl.splits&&bl.splits.length){bl.splits.forEach(sp=>{if(sp.sid===bl.staffId)return;const spSub=gsN(sp.sid);if(!spSub)return;const spIsPerm=permBlocks.some(pb=>pb.staffId===sp.sid);if(!spIsPerm&&!isStaffOut(sp.sid)){const key2=sp.sid+'|'+c.id;if(!seenSubs.has(key2)){seenSubs.add(key2);const permName=permStaffId?gsN(permStaffId)?.name:null;items.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:spSub.name+' covering '+c.name+' ('+sp.from+'-'+sp.to+')',sub:permName?'Usually: '+permName:'Not their regular client'});}}});}
   });
   // 5. Temp blocks
   (S.tempBlocks||[]).filter(tb=>tb.day===today).forEach(tb=>{const c=gcN(tb.cid);const s=gsN(tb.staffId);items.push({icon:'📌',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:'Temp block'+(tb.label?' – '+tb.label:'')+(c?' for '+c.name:''),sub:tb.from+'-'+tb.to+(s?' • '+s.name:'')+(tb.staffId?'':' • Unassigned')});});
