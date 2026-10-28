@@ -863,9 +863,15 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId){
     </div>`;
   }
 
-  // Remove assignment button at TOP so it's always visible regardless of list length
+  // Remove assignment button — only show when there's a today-only override active
   let removeBtn='';
-  if(currentSid||isTemp){
+  const hasTodayOverride=!isTemp&&(()=>{
+    const iso2=todayISO();
+    const hasStOv=(S.staffOverrides[cid]||[]).some(o=>parseInt(o.blockIdx,10)===blockIdx&&o.day===day&&o.date===iso2);
+    const hasSpOv=(S.splitOverrides[cid]||[]).some(o=>parseInt(o.blockIdx,10)===blockIdx&&o.day===day&&o.date===iso2);
+    return hasStOv||hasSpOv;
+  })();
+  if(isTemp||(currentSid&&hasTodayOverride)){
     removeBtn=`<button class="unassign-btn" style="margin-bottom:8px;" onclick="doAssign('${cid}','${day}',${isTemp?-1:blockIdx},null,'${tempId||''}')">✕ Remove assignment</button>`;
   }
   if(isTemp){
@@ -954,16 +960,14 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
     // Regular block — store as a today-only staff override, never touch c.schedule
     const iso=todayISO();
     const bi=parseInt(blockIdx,10);
-    console.log('[doAssign] newSid:',newSid,'bi:',bi,'staffOverrides before:',JSON.stringify(S.staffOverrides[cid]),'permBlock:',JSON.stringify(gcN(cid)?.schedule[day]?.[bi]));
     if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
     S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&parseInt(o.blockIdx,10)===bi&&o.date===iso));
-    console.log('[doAssign] staffOverrides after:',JSON.stringify(S.staffOverrides[cid]));
     if(newSid) S.staffOverrides[cid].push({day,blockIdx:bi,staffId:newSid,date:iso});
     // Also clear any split overrides for this block when removing/reassigning
     if(S.splitOverrides[cid]){
       S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
     }
-    // Also clear splits stored directly on the permanent block (legacy data)
+    // Clear splits stored directly on the permanent block (old doAssignPartial wrote here)
     const permBlk2=(gcN(cid)?.schedule[day]||[])[bi];
     if(permBlk2&&permBlk2.splits){permBlk2.splits=null;}
     const permStaff=gcN(cid)?.schedule[day]?.[blockIdx]?.staffId;
