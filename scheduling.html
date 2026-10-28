@@ -1268,7 +1268,7 @@ function computeWeeklyChanges(weekOff){
     });
     // 4. Staff overrides / coverage substitutions for this day
     const seenSubs=new Set();
-    getDayBlocks(day).forEach(bl=>{
+    getDayBlocks(day,iso).forEach(bl=>{
       if(!bl.staffId||bl.isTemp)return;
       const c=gcN(bl.client.id);if(!c)return;
       const sub=gsN(bl.staffId);if(!sub)return;

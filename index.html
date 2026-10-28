@@ -1958,6 +1958,71 @@ async function fetchWeeklySchedule() {
 
   try {
     resetClientColors();
+
+    // For future weeks, build grid directly from cachedScheduleState (clients + staffOverrides)
+    // rather than relying on staff_schedules which only has the permanent schedule
+    if (portalWeekOffset !== 0 && !cachedScheduleState) {
+      // cachedScheduleState not loaded yet — fetch it first, then re-render
+      await fetchTodaysChanges();
+      // Now cachedScheduleState should be populated; re-run fetchWeeklySchedule
+      await fetchWeeklySchedule();
+      return;
+    }
+    if (portalWeekOffset !== 0 && cachedScheduleState) {
+      const weekDates = getPortalWeekDates(portalWeekOffset);
+      const staffById = {};
+      (cachedScheduleState.staff || []).forEach(s => { staffById[s.id] = s; });
+
+      // Build data rows from clients' permanent schedule, then apply overrides
+      const data = [];
+      (cachedScheduleState.clients || []).forEach(client => {
+        const sched = client.schedule || {};
+        ['Mon','Tue','Wed','Thu','Fri'].forEach(day => {
+          const blocks = sched[day] || [];
+          blocks.forEach((blk, blockIdx) => {
+            if (!blk || !blk.from) return;
+            // Find permanent staff name
+            let staffName = null;
+            let overridden = false;
+            if (blk.staffId) {
+              staffName = (staffById[blk.staffId]?.name) || null;
+            }
+
+            // Check for a date-specific override for this block
+            const dayIso = weekDates[day];
+            const dayIsoStr = dayIso ? dayIso.toISOString().slice(0,10) : null;
+            if (dayIsoStr) {
+              const overrides = (cachedScheduleState.staffOverrides || {})[client.id] || [];
+              const ov = overrides.find(o => o.day === day && parseInt(o.blockIdx,10) === blockIdx && o.date === dayIsoStr);
+              if (ov) {
+                staffName = ov.staffId ? (staffById[ov.staffId]?.name || null) : null;
+                overridden = true;
+              }
+            }
+
+            data.push({
+              client_name: client.name || '',
+              day: day,
+              start_time: blk.from,
+              end_time: blk.to || '',
+              staff_name: staffName,
+              _overridden: overridden
+            });
+          });
+        });
+      });
+
+      if (!data.length) {
+        bodyEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-size:0.9rem;">No schedule data available.<br><span style="font-size:0.8rem;opacity:0.7;">Push from CCABA Scheduling to populate.</span></div>';
+        if(statusEl) { statusEl.textContent = '— No data'; statusEl.style.background = 'rgba(255,255,255,0.15)'; }
+        return;
+      }
+
+      renderWeeklyGrid(data, bodyEl, statusEl, timeEl);
+      return;
+    }
+
+    // Current week: fetch from staff_schedules table as before
     const res = await fetch(SUPABASE_URL + '/rest/v1/staff_schedules?order=day.asc,start_time.asc', {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     });
@@ -1969,49 +2034,15 @@ async function fetchWeeklySchedule() {
       return;
     }
 
-    // Apply date-specific overrides from cachedScheduleState for the viewed week
-    // This handles future-week fill-in assignments and removals stored in schedule_state
-    if (cachedScheduleState && portalWeekOffset !== 0) {
-      const weekDates = getPortalWeekDates(portalWeekOffset);
-      const staffById = {};
-      (cachedScheduleState.staff || []).forEach(s => { staffById[s.id] = s; });
-      const clientsById = {};
-      (cachedScheduleState.clients || []).forEach(c => { clientsById[c.id] = c; });
+    renderWeeklyGrid(data, bodyEl, statusEl, timeEl);
 
-      // Build a map: "clientName|day|startTime" -> override staff name (null = removed)
-      const overrideMap = {}; // key -> staffName or null
+  } catch(e) {
+    if(bodyEl) bodyEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);">Could not load weekly schedule.</div>';
+    if(statusEl) { statusEl.textContent = 'Connection error'; statusEl.style.background = 'rgba(255,107,107,0.2)'; }
+  }
+}
 
-      // Apply staffOverrides
-      Object.entries(cachedScheduleState.staffOverrides || {}).forEach(([cid, ovList]) => {
-        if (!Array.isArray(ovList)) return;
-        const client = clientsById[cid];
-        if (!client) return;
-        ovList.forEach(ov => {
-          const dayIso = weekDates[ov.day];
-          if (!dayIso) return;
-          const dayIsoStr = dayIso.toISOString().slice(0,10);
-          if (ov.date !== dayIsoStr) return;
-          // Find the block's start time
-          const blk = (client.schedule[ov.day] || [])[parseInt(ov.blockIdx, 10)];
-          if (!blk) return;
-          const key = (client.name||'') + '|' + ov.day + '|' + blk.from;
-          const newStaff = ov.staffId ? (staffById[ov.staffId]?.name || null) : null;
-          overrideMap[key] = newStaff; // null means removed
-        });
-      });
-
-      // Apply overrideMap to the data rows
-      if (Object.keys(overrideMap).length) {
-        data.forEach(r => {
-          const key = (r.client_name||'') + '|' + r.day + '|' + (r.start_time||'');
-          if (key in overrideMap) {
-            r.staff_name = overrideMap[key]; // null = removed/unassigned
-            r._overridden = true;
-          }
-        });
-      }
-    }
-
+function renderWeeklyGrid(data, bodyEl, statusEl, timeEl) {
     // Group by day, then by time slot
     var byDaySlot = {};
     DAYS_ORDER.forEach(function(d) {
@@ -2124,11 +2155,6 @@ async function fetchWeeklySchedule() {
 
     if(statusEl) { statusEl.textContent = 'Live from Scheduling'; statusEl.style.background = 'rgba(107,191,127,0.25)'; }
     if(timeEl) timeEl.textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-
-  } catch(e) {
-    if(bodyEl) bodyEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);">Could not load weekly schedule.</div>';
-    if(statusEl) { statusEl.textContent = 'Connection error'; statusEl.style.background = 'rgba(255,107,107,0.2)'; }
-  }
 }
 
 // ===================== COVERAGE REQUESTS =====================
