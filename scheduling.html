@@ -1207,35 +1207,32 @@ async function tryLoad(){
 
 // Returns ISO date string for a given day-of-week in the current scheduling week (Mon-Fri)
 // The scheduling week runs Mon-Fri. Saturday/Sunday belong to the NEXT week.
-function isoForDay(dayName){
+function isoForDay(dayName, weekOffset){
   const dayIdx={Mon:1,Tue:2,Wed:3,Thu:4,Fri:5};
   const target=dayIdx[dayName];
   if(target===undefined)return null;
   const now=new Date();
-  const dow=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
-  // If today is Sat(6) or Sun(0), we're planning the NEXT week
-  const weekOffset=(dow===0||dow===6)?1:0;
-  // Find Monday of the target week
-  const monday=new Date(now);
-  const daysToMon=((dow===0?7:dow)-1)+(weekOffset*7);
-  monday.setDate(now.getDate()-daysToMon+(weekOffset===1?7:0));
-  // Actually simpler: find this week's Monday
+  const dow=now.getDay();
+  // Default: if today is Sat/Sun, plan next week (offset=1), else current week
+  const baseOffset=(weekOffset!==undefined)?weekOffset:((dow===0||dow===6)?1:0);
   const thisMonday=new Date(now);
   const d=now.getDay();
-  thisMonday.setDate(now.getDate()-(d===0?6:d-1)+(weekOffset*7));
+  thisMonday.setDate(now.getDate()-(d===0?6:d-1)+(baseOffset*7));
   thisMonday.setHours(0,0,0,0);
   const result=new Date(thisMonday);
   result.setDate(thisMonday.getDate()+(target-1));
   return result.toISOString().slice(0,10);
 }
 
-function computeWeeklyChanges(){
-  // Compute changes for each day Mon-Fri for the current/upcoming week
-  // Returns { "2026-10-13": [...items], "2026-10-14": [...items], ... }
+function computeWeeklyChanges(weekOff){
+  // Compute changes for each day Mon-Fri for a given week offset
+  // weekOff=0 → current week, 1 → next week, etc.
+  // Returns { "YYYY-MM-DD": {day, items[]}, ... } keyed by ISO date
+  if(weekOff===undefined)weekOff=0;
   const result={};
   DAYS.forEach(day=>{
-    const iso=isoForDay(day);
-    if(!iso){result[day]={iso:null,items:[]};return;}
+    const iso=isoForDay(day,weekOff);
+    if(!iso)return;
     const items=[];
     const ovList2=S.clientOverrides||{};
     const stOvList2=S.staffOverrides||{};
@@ -1281,7 +1278,7 @@ function computeWeeklyChanges(){
     // 5. Temp blocks for this day
     (S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);const s=gsN(tb.staffId);items.push({icon:'📌',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',text:'Temp block'+(tb.label?' – '+tb.label:'')+(c?' for '+c.name:''),sub:tb.from+'-'+tb.to+(s?' • '+s.name:'')+(tb.staffId?'':' • Unassigned')});});
 
-    result[day]={iso,items};
+    result[iso]={day,items};
   });
   return result;
 }
@@ -1352,7 +1349,9 @@ async function doSave(silent){
       icon:ci.icon,text:ci.text,sub:ci.sub||'',
       color:ci.color,bg:ci.bg,border:ci.border
     }));
-    const weeklyChanges=computeWeeklyChanges();
+    // Compute weekly changes for current + next 3 weeks, keyed by ISO date
+    const weeklyChanges={};
+    for(let wo=0;wo<4;wo++){Object.assign(weeklyChanges,computeWeeklyChanges(wo));}
     const d={clients:S.clients,staff:S.staff,pods:S.pods,tempBlocks:S.tempBlocks,calledOut:S.calledOut,calledOutClients:S.calledOutClients,clientOverrides:S.clientOverrides,clientOverrideCounts:S.clientOverrideCounts||{},staffOverrides:S.staffOverrides||{},splitOverrides:S.splitOverrides||{},acknowledgedChanges:S.acknowledgedChanges||{},eventLog:S.eventLog||[],portalChanges:portalChanges,weeklyChanges:weeklyChanges,savedAt:new Date().toISOString()};
     // Save to localStorage immediately as fast cache
     try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}

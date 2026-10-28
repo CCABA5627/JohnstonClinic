@@ -594,14 +594,27 @@
     <div class="topbar">
       <div class="topbar-title">
         <h2>📆 Weekly Schedule</h2>
-        <p>Full week view pulled from CCABA Scheduling</p>
+        <p id="weekly-subtitle">Full week view pulled from CCABA Scheduling</p>
       </div>
       <div class="date-badge" id="timeline-date"></div>
     </div>
+
+    <!-- WEEK NAVIGATION -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:10px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+      <button onclick="changePortalWeek(-1)" style="background:none;border:1px solid #cdd3db;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600;color:var(--navy);">← Prev</button>
+      <div style="text-align:center;">
+        <div id="portal-week-label" style="font-size:0.88rem;font-weight:700;color:var(--navy);"></div>
+        <div id="portal-week-today-btn" style="display:none;margin-top:4px;">
+          <button onclick="goToPortalCurrentWeek()" style="background:var(--blue);color:#fff;border:none;border-radius:20px;padding:3px 12px;font-size:0.72rem;font-weight:600;cursor:pointer;">Today</button>
+        </div>
+      </div>
+      <button onclick="changePortalWeek(1)" style="background:none;border:1px solid #cdd3db;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600;color:var(--navy);">Next →</button>
+    </div>
+
     <!-- WEEK'S UPDATES BOX -->
     <div id="weekly-changes-box" style="background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <h3 style="margin:0;font-size:0.95rem;font-weight:700;color:var(--navy);">📋 This Week's Updates</h3>
+        <h3 id="weekly-changes-title" style="margin:0;font-size:0.95rem;font-weight:700;color:var(--navy);">📋 This Week's Updates</h3>
         <span id="weekly-changes-badge" style="display:none;background:#1E3A5F;color:#fff;font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:20px;"></span>
       </div>
       <div id="weekly-changes-inner" style="display:flex;flex-direction:column;gap:10px;">
@@ -974,6 +987,78 @@ const DEFAULT_CALENDAR_EVENTS = [
 const SUPABASE_URL = 'https://ziyuuprfoozzlcdtxhlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppeXV1cHJmb296emxjZHR4aGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTk3NDEsImV4cCI6MjA5NzczNTc0MX0.26hwhypq0elib35SFGa7ErLmgmAtpIoOnUIZ6_eALQ0';
 
+// Portal week offset for weekly schedule navigation (0 = current week)
+let portalWeekOffset = 0;
+let cachedScheduleState = null; // store last fetched state for re-rendering
+
+function getPortalWeekDates(offset) {
+  const now = new Date();
+  const dow = now.getDay();
+  const daysToMon = dow === 0 ? 6 : dow - 1;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - daysToMon + (offset * 7));
+  mon.setHours(0, 0, 0, 0);
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  const result = {};
+  days.forEach((d, i) => {
+    const dt = new Date(mon);
+    dt.setDate(mon.getDate() + i);
+    result[d] = dt;
+  });
+  return result;
+}
+
+function fmtPortalDate(dt) {
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+
+function updatePortalWeekNav() {
+  const dates = getPortalWeekDates(portalWeekOffset);
+  const mon = dates['Mon'];
+  const fri = dates['Fri'];
+  const monStr = fmtPortalDate(mon);
+  const friStr = fmtPortalDate(fri);
+  const year = fri.getFullYear();
+  const label = document.getElementById('portal-week-label');
+  const todayBtn = document.getElementById('portal-week-today-btn');
+  const title = document.getElementById('weekly-changes-title');
+  if (label) label.textContent = monStr + ' – ' + friStr + ', ' + year;
+  if (todayBtn) todayBtn.style.display = portalWeekOffset !== 0 ? 'block' : 'none';
+  if (title) title.textContent = portalWeekOffset === 0 ? '📋 This Week\'s Updates' : '📋 Week\'s Updates';
+}
+
+function changePortalWeek(delta) {
+  // Don't go before current week
+  if (portalWeekOffset + delta < 0) return;
+  portalWeekOffset += delta;
+  updatePortalWeekNav();
+  updateWeeklyScheduleHeaders();
+  if (cachedScheduleState) renderWeeklyChangesBox(cachedScheduleState);
+}
+
+function goToPortalCurrentWeek() {
+  portalWeekOffset = 0;
+  updatePortalWeekNav();
+  updateWeeklyScheduleHeaders();
+  if (cachedScheduleState) renderWeeklyChangesBox(cachedScheduleState);
+}
+
+function updateWeeklyScheduleHeaders() {
+  // Update day column headers in the weekly schedule table to show dates
+  const dates = getPortalWeekDates(portalWeekOffset);
+  const now = new Date(); now.setHours(0,0,0,0);
+  document.querySelectorAll('[data-day-header]').forEach(th => {
+    const d = th.getAttribute('data-day-header');
+    const dt = dates[d];
+    if (!dt) return;
+    const isToday = dt.getTime() === now.getTime();
+    const dateStr = (dt.getMonth()+1) + '/' + dt.getDate();
+    th.innerHTML = d + '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">' + (isToday ? 'today' : dateStr) + '</span>';
+    th.style.background = isToday ? '#EAF2FD' : '#f7f7f9';
+    th.style.color = isToday ? 'var(--blue)' : 'var(--text)';
+  });
+}
+
 async function fetchAssignmentsFromSupabase() {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -1018,6 +1103,7 @@ async function fetchTodaysChanges() {
         console.log('[WeeklyChanges]', day, 'iso:', entry?.iso, 'items:', entry?.items?.length, entry?.items?.map(i=>i.text));
       });
     }
+    cachedScheduleState = raw;
     renderTodaysChangesBox(raw);
     renderWeeklyChangesBox(raw);
   } catch(e) {
@@ -1033,25 +1119,34 @@ function renderWeeklyChangesBox(data) {
   if (!inner) return;
 
   const weeklyChanges = data.weeklyChanges || {};
-  console.log('[WeeklyChanges] keys:', Object.keys(weeklyChanges), JSON.stringify(weeklyChanges).slice(0,300));
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri'];
   const DAY_LABELS = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
 
-  // Collect days that have changes and are today or in the future
+  // Get the ISO date range for the currently displayed week
+  const weekDates = getPortalWeekDates(portalWeekOffset);
+  const weekIsos = Object.values(weekDates).map(dt => dt.toISOString().slice(0,10));
+  const weekIsoSet = new Set(weekIsos);
+
+  // Collect days in the viewed week that have changes
+  // weeklyChanges is now keyed by ISO date: { "YYYY-MM-DD": {day, items[]}, ... }
   const sections = [];
-  DAY_NAMES.forEach(day => {
-    const entry = weeklyChanges[day];
-    if (!entry || !entry.iso || !entry.items || entry.items.length === 0) return;
-    const entryDate = new Date(entry.iso + 'T00:00:00');
-    if (entryDate < today) return; // past days — skip
-    sections.push({ day, iso: entry.iso, items: entry.items, date: entryDate });
+  weekIsos.forEach(iso => {
+    const entry = weeklyChanges[iso];
+    if (!entry || !entry.items || entry.items.length === 0) return;
+    const entryDate = new Date(iso + 'T00:00:00');
+    // For current week, skip past days; for future weeks, show all
+    if (portalWeekOffset === 0 && entryDate < today) return;
+    const day = entry.day || Object.keys(weekDates).find(k => weekDates[k].toISOString().slice(0,10) === iso);
+    sections.push({ day, iso, items: entry.items, date: entryDate });
   });
+  // Sort by date
+  sections.sort((a,b) => a.date - b.date);
 
   if (sections.length === 0) {
-    inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No schedule changes this week.</div>';
+    const noChgMsg = portalWeekOffset === 0 ? 'No schedule changes this week.' : 'No schedule changes for this week.';
+    inner.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">' + noChgMsg + '</div>';
     if (badge) badge.style.display = 'none';
     return;
   }
@@ -1914,13 +2009,17 @@ async function fetchWeeklySchedule() {
     var html = '<div style="overflow-x:auto;">'
       + '<table style="width:100%;min-width:520px;border-collapse:collapse;border:1px solid ' + borderColor + ';border-radius:10px;overflow:hidden;font-size:0.72rem;">';
 
-    // Header row
+    // Header row — dates come from portalWeekOffset
+    var weekDatesForHeader = getPortalWeekDates(portalWeekOffset);
+    var nowMidnight = new Date(); nowMidnight.setHours(0,0,0,0);
     html += '<thead><tr>'
       + '<th style="background:#f7f7f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';width:60px;text-align:left;">Time</th>';
     DAYS_ORDER.forEach(function(d) {
-      var isToday = d === todayName;
-      html += '<th style="background:' + (isToday ? '#EAF2FD' : '#f7f7f9') + ';padding:8px 6px;font-size:0.8rem;font-weight:700;color:' + (isToday ? 'var(--blue)' : 'var(--text)') + ';text-align:center;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">'
-        + d + (isToday ? '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">today</span>' : '') + '</th>';
+      var dt = weekDatesForHeader[d];
+      var isToday = dt && dt.getTime() === nowMidnight.getTime();
+      var dateStr = dt ? (dt.getMonth()+1) + '/' + dt.getDate() : '';
+      html += '<th data-day-header="' + d + '" style="background:' + (isToday ? '#EAF2FD' : '#f7f7f9') + ';padding:8px 6px;font-size:0.8rem;font-weight:700;color:' + (isToday ? 'var(--blue)' : 'var(--text)') + ';text-align:center;border-bottom:1px solid ' + borderColor + ';border-right:1px solid ' + borderColor + ';">'
+        + d + '<br><span style="font-size:0.62rem;font-weight:500;opacity:0.75;">' + (isToday ? 'today' : dateStr) + '</span></th>';
     });
     html += '</tr></thead><tbody>';
 
@@ -2375,6 +2474,7 @@ function init() {
   fetchShoutoutsFromSupabase();
   fetchTrainingFromSupabase();
   fetchCalendarFromSupabase();
+  updatePortalWeekNav();
   fetchWeeklySchedule();
   fetchCoverageFromSupabase();
   fetchRemindersFromSupabase();
