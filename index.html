@@ -1168,7 +1168,18 @@ function renderWeeklyChangesBox(data) {
       + '<span style="margin-left:auto;font-size:0.72rem;font-weight:600;background:' + (isCurrentDay ? 'rgba(255,255,255,0.2)' : '#e0e4ea') + ';color:' + (isCurrentDay ? '#fff' : '#555') + ';padding:2px 7px;border-radius:10px;">' + s.items.length + ' change' + (s.items.length !== 1 ? 's' : '') + '</span>'
       + '</div>'
       + '<div style="display:flex;flex-direction:column;gap:0;">'
-      + s.items.map((ci, idx) => {
+      + [...s.items].sort((a, b) => {
+          // Sort by start time extracted from sub (e.g. "8:00 AM-12:00 PM" or "8:00 AM-12:00 PM • Staff")
+          function subToMinutes(ci) {
+            const m = (ci.sub || '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (!m) return 9999;
+            let h = parseInt(m[1]), min = parseInt(m[2]), ampm = m[3].toUpperCase();
+            if (ampm === 'PM' && h !== 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+            return h * 60 + min;
+          }
+          return subToMinutes(a) - subToMinutes(b);
+        }).map((ci, idx) => {
           // Reformat legacy "Temp block – Temp block for X • Staff" -> "Staff covering X"
           let displayText = ci.text;
           if (ci.icon === '📌' && /^Temp block/i.test(displayText)) {
@@ -1209,7 +1220,15 @@ function renderTodaysChangesBox(data) {
     return;
   }
 
-  inner.innerHTML = items.map(ci => {
+  function subToMinutes(ci) {
+    const m = (ci.sub || '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return 9999;
+    let h = parseInt(m[1]), min = parseInt(m[2]), ampm = m[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  }
+  inner.innerHTML = [...items].sort((a, b) => subToMinutes(a) - subToMinutes(b)).map(ci => {
     // Reformat legacy "Temp block – Temp block for X • Staff" -> "Staff covering X"
     let displayText = ci.text;
     if (ci.icon === '📌' && /^Temp block/i.test(displayText)) {
