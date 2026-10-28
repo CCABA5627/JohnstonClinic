@@ -954,7 +954,7 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
     // Regular block — store as a today-only staff override, never touch c.schedule
     const iso=todayISO();
     const bi=parseInt(blockIdx,10);
-    console.log('[doAssign] newSid:',newSid,'bi:',bi,'staffOverrides before:',JSON.stringify(S.staffOverrides[cid]));
+    console.log('[doAssign] newSid:',newSid,'bi:',bi,'staffOverrides before:',JSON.stringify(S.staffOverrides[cid]),'permBlock:',JSON.stringify(gcN(cid)?.schedule[day]?.[bi]));
     if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
     S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&parseInt(o.blockIdx,10)===bi&&o.date===iso));
     console.log('[doAssign] staffOverrides after:',JSON.stringify(S.staffOverrides[cid]));
