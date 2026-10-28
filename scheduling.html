@@ -958,11 +958,12 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
     if(newSid) S.staffOverrides[cid].push({day,blockIdx,staffId:newSid,date:iso});
     // Also clear any split overrides for this block when removing/reassigning
     const bi=parseInt(blockIdx,10);
-    console.log('[doAssign] clearing splits for cid:',cid,'day:',day,'bi:',bi,'iso:',iso,'splitOverrides:',JSON.stringify(S.splitOverrides[cid]));
     if(S.splitOverrides[cid]){
       S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
     }
-    console.log('[doAssign] after clear:',JSON.stringify(S.splitOverrides[cid]));
+    // Also clear splits stored directly on the permanent block (legacy data)
+    const permBlk2=(gcN(cid)?.schedule[day]||[])[bi];
+    if(permBlk2&&permBlk2.splits){permBlk2.splits=null;}
     const permStaff=gcN(cid)?.schedule[day]?.[blockIdx]?.staffId;
     const subName=gsN(newSid)?.name;const permName=gsN(permStaff)?.name;
     showToast((subName||'Staff')+' assigned for today only'+(permName?' (normally: '+permName+')':''),false);
@@ -1081,7 +1082,6 @@ function removeSplit(cid,day,blockIdx,sid,tempId){
 }
 
 function clearAllSplits(cid,day,blockIdx,tempId){
-  console.log('[clearAllSplits] cid:',cid,'day:',day,'blockIdx:',blockIdx,'tempId:',tempId,'splitOverrides:',JSON.stringify(S.splitOverrides));
   if(tempId){
     const blk=getBlk(cid,day,blockIdx,tempId);
     if(!blk)return;
@@ -1089,7 +1089,6 @@ function clearAllSplits(cid,day,blockIdx,tempId){
   } else {
     const iso=todayISO();
     const bi=parseInt(blockIdx,10);
-    console.log('[clearAllSplits] iso:',iso,'bi:',bi,'splitOverrides[cid]:',JSON.stringify(S.splitOverrides[cid]));
     // Clear split overrides for this block
     if(S.splitOverrides[cid]){
       S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
@@ -1098,7 +1097,9 @@ function clearAllSplits(cid,day,blockIdx,tempId){
     if(S.staffOverrides[cid]){
       S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
     }
-    console.log('[clearAllSplits] after clear:',JSON.stringify(S.splitOverrides[cid]));
+    // Also clear splits stored directly on the permanent block (legacy data from before splitOverrides)
+    const permBlk=(gcN(cid)?.schedule[day]||[])[bi];
+    if(permBlk&&permBlk.splits){permBlk.splits=null;}
   }
   markDirty();closeModal();render();
 }
