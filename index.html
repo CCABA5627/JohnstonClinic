@@ -1224,7 +1224,7 @@ function saveData(key, val) {
 }
 
 // ===================== STATE =====================
-let calYear = 2026, calMonth = 5;
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
 let selectedStaff = null;
 let assignments = loadData('cc_assignments', DEFAULT_ASSIGNMENTS);
 let staffList = loadData('cc_staff', DEFAULT_STAFF);

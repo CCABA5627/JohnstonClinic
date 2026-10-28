@@ -1760,8 +1760,10 @@ function saveReminder() {
 function deleteReminder(i) {
   if(!confirm('Delete this reminder card?')) return;
   const id = reminders[i]?._id;
-  if(id) deleteReminderFromSupabase(id).then(()=>fetchRemindersFromSupabase());
+  reminders.splice(i, 1);
+  renderRemindersMgmt();
   showToast('Reminder deleted.');
+  if(id) deleteReminderFromSupabase(id);
 }
 
 async function refreshFromScheduling() {
