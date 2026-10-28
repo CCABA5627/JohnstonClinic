@@ -2026,6 +2026,27 @@ async function fetchWeeklySchedule() {
         });
       });
 
+      // Add temp blocks for this week
+      const staffById2 = staffById; // already built above
+      (cachedScheduleState.tempBlocks || []).forEach(tb => {
+        const dayIso = weekDates[tb.day];
+        if (!dayIso) return;
+        const dayIsoStr = dayIso.toISOString().slice(0,10);
+        const client = (cachedScheduleState.clients || []).find(c => c.id === tb.cid);
+        const staffName = tb.staffId ? (staffById2[tb.staffId]?.name || null) : null;
+        // Skip if this staff is called out on this date
+        if (staffName && calledOutByDate[dayIsoStr]?.has(tb.staffId)) return;
+        data.push({
+          client_name: client ? client.name : '',
+          day: tb.day,
+          start_time: tb.from,
+          end_time: tb.to || '',
+          staff_name: staffName,
+          _overridden: false,
+          _isTemp: true
+        });
+      });
+
       if (!data.length) {
         bodyEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-size:0.9rem;">No schedule data available.<br><span style="font-size:0.8rem;opacity:0.7;">Push from CCABA Scheduling to populate.</span></div>';
         if(statusEl) { statusEl.textContent = '— No data'; statusEl.style.background = 'rgba(255,255,255,0.15)'; }
@@ -2092,6 +2113,34 @@ async function fetchWeeklySchedule() {
           r.staff_name = null;
           r._overridden = true;
         }
+      });
+    }
+
+    // Add today's temp blocks from cachedScheduleState
+    if (cachedScheduleState) {
+      const todayIso2 = new Date().toISOString().slice(0,10);
+      const todayName2 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+      const staffById2 = {};
+      (cachedScheduleState.staff || []).forEach(s => { staffById2[s.id] = s; });
+      const clientsById2 = {};
+      (cachedScheduleState.clients || []).forEach(c => { clientsById2[c.id] = c; });
+      const calledOutIds = new Set();
+      (cachedScheduleState.calledOut || []).forEach(co => {
+        if (!co.date || co.date === todayIso2) calledOutIds.add(co.sid);
+      });
+      (cachedScheduleState.tempBlocks || []).filter(tb => tb.day === todayName2).forEach(tb => {
+        if (tb.staffId && calledOutIds.has(tb.staffId)) return;
+        const client = clientsById2[tb.cid];
+        const staffName = tb.staffId ? (staffById2[tb.staffId]?.name || null) : null;
+        data.push({
+          client_name: client ? client.name : '',
+          day: todayName2,
+          start_time: tb.from,
+          end_time: tb.to || '',
+          staff_name: staffName,
+          _overridden: false,
+          _isTemp: true
+        });
       });
     }
 
