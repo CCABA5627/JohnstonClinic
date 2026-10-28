@@ -559,7 +559,7 @@ function getEffectiveBlocks(cid, day){
   return Array.from({length:count},(_,idx)=>{
     const blk=blocks[idx]||{from:'',to:'',staffId:null,splits:null};
     const ov=activeOvs.find(o=>o.blockIdx===idx);
-    const stOv=activeStOvs.find(o=>o.blockIdx===idx);
+    const stOv=activeStOvs.find(o=>parseInt(o.blockIdx,10)===idx);
     const spOv=activeSpOvs.find(o=>parseInt(o.blockIdx,10)===idx);
     let result={...blk};
     if(ov) result={...result,from:ov.from,to:ov.to,_overridden:true,_origFrom:blk.from,_origTo:blk.to};
@@ -953,11 +953,13 @@ function doAssign(cid,day,blockIdx,newSid,tempId){
   } else {
     // Regular block — store as a today-only staff override, never touch c.schedule
     const iso=todayISO();
-    if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
-    S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===blockIdx&&o.date===iso));
-    if(newSid) S.staffOverrides[cid].push({day,blockIdx,staffId:newSid,date:iso});
-    // Also clear any split overrides for this block when removing/reassigning
     const bi=parseInt(blockIdx,10);
+    console.log('[doAssign] newSid:',newSid,'bi:',bi,'staffOverrides before:',JSON.stringify(S.staffOverrides[cid]));
+    if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
+    S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&parseInt(o.blockIdx,10)===bi&&o.date===iso));
+    console.log('[doAssign] staffOverrides after:',JSON.stringify(S.staffOverrides[cid]));
+    if(newSid) S.staffOverrides[cid].push({day,blockIdx:bi,staffId:newSid,date:iso});
+    // Also clear any split overrides for this block when removing/reassigning
     if(S.splitOverrides[cid]){
       S.splitOverrides[cid]=S.splitOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
     }
@@ -1095,7 +1097,7 @@ function clearAllSplits(cid,day,blockIdx,tempId){
     }
     // Also clear any staff override for this block
     if(S.staffOverrides[cid]){
-      S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&o.blockIdx===bi&&o.date===iso));
+      S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.day===day&&parseInt(o.blockIdx,10)===bi&&o.date===iso));
     }
     // Also clear splits stored directly on the permanent block (legacy data from before splitOverrides)
     const permBlk=(gcN(cid)?.schedule[day]||[])[bi];
