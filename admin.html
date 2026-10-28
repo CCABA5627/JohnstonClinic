@@ -408,19 +408,21 @@
   <!-- CALENDAR MANAGEMENT -->
   <section class="page-section" id="page-calendar-mgmt">
     <div class="topbar">
-      <div class="topbar-title"><h2>🗓️ Team Calendar</h2><p>Add birthdays, outings, and potlucks</p></div>
+      <div class="topbar-title"><h2>🗓️ Team Calendar</h2><p>Add birthdays, outings, potlucks, and other events</p></div>
     </div>
     <div class="grid-2">
       <div class="card">
         <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Add Event</div>
         <div class="form-group"><label>Date</label><input type="date" id="ev-date"></div>
         <div class="form-group"><label>Event Type</label>
-          <select id="ev-type">
+          <select id="ev-type" onchange="toggleOtherLabel(this.value)">
             <option value="birthday">🎂 Birthday</option>
             <option value="outing">🏞️ Team Outing</option>
             <option value="potluck">🍲 Potluck</option>
+            <option value="other">📌 Other</option>
           </select>
         </div>
+        <div class="form-group" id="ev-other-name-group" style="display:none"><label>Event Name</label><input type="text" id="ev-other-name" placeholder="e.g. Staff Training, Office Closure..."></div>
         <div class="form-group"><label>Label (shown on calendar)</label><input type="text" id="ev-label" placeholder="e.g. 🎂 Mia's Birthday"></div>
         <button class="btn btn-primary" onclick="addCalEvent()">Add to Calendar</button>
       </div>
@@ -1693,11 +1695,24 @@ function renderCalMgmt() {
       <button class="btn btn-danger btn-sm" onclick="deleteCalEvent(${i})">✕</button>
     </li>`).join('') || '<li style="color:var(--muted);font-size:0.85rem;padding:10px 0;">No events yet.</li>';
 }
+function toggleOtherLabel(val){
+  document.getElementById('ev-other-name-group').style.display=val==='other'?'':'none';
+}
 function addCalEvent(){
-  const date=document.getElementById('ev-date').value,type=document.getElementById('ev-type').value,label=document.getElementById('ev-label').value.trim();
-  if(!date||!label) { showToast('Please fill in date and label.'); return; }
+  const date=document.getElementById('ev-date').value,type=document.getElementById('ev-type').value;
+  let label=document.getElementById('ev-label').value.trim();
+  if(type==='other'){
+    const otherName=document.getElementById('ev-other-name').value.trim();
+    if(!otherName){showToast('Please enter an event name.');return;}
+    if(!label)label='📌 '+otherName;
+  }
+  if(!date||!label){showToast('Please fill in date and label.');return;}
   saveCalEventToSupabase({date,type,label}).then(()=>fetchCalendarFromSupabase());
-  document.getElementById('ev-date').value=''; document.getElementById('ev-label').value='';
+  document.getElementById('ev-date').value='';
+  document.getElementById('ev-label').value='';
+  document.getElementById('ev-other-name').value='';
+  document.getElementById('ev-type').value='birthday';
+  toggleOtherLabel('birthday');
   showToast('Event added to calendar!');
 }
 function deleteCalEvent(i){
