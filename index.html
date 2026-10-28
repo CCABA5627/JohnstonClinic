@@ -1531,7 +1531,7 @@ const DEFAULT_REMINDERS = [
   { title: '🌳 Outside Play Rules', color: 'var(--green)', items: ['Always have a staff member present outside', 'Check playground equipment before use', 'No running near the parking lot', 'Apply sunscreen if outside 30+ min'] },
   { title: '👥 Group Time Rules', color: 'var(--blue)', items: ['Begin with a greeting activity', 'Use visual supports and schedules', 'Reinforce appropriate social behaviors immediately', 'Maximum 4 clients per group unless BCBA approved'] },
 ];
-let reminders = loadData('cc_reminders', DEFAULT_REMINDERS);
+let reminders = [];
 
 function renderReminders() {
   const grid = document.getElementById('reminders-grid');
@@ -2573,7 +2573,7 @@ async function fetchRemindersFromSupabase() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/reminders?order=sort_order.asc`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
     const data = await res.json();
-    if (Array.isArray(data) && data.length) {
+    if (Array.isArray(data)) {
       reminders = data.map(r=>({ title:r.title, color:r.color, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
       renderReminders();
     }

@@ -764,8 +764,8 @@ async function fetchTimelineFromSupabase() {
 async function fetchRemindersFromSupabase() {
   try {
     const data = await sbGet('reminders', '?order=sort_order.asc');
-    if (Array.isArray(data) && data.length) {
-      reminders = data.map(r => ({ title: r.title, color: r.color, items: r.items, _id: r.id }));
+    if (Array.isArray(data)) {
+      reminders = data.map(r => ({ title: r.title, color: r.color, items: Array.isArray(r.items) ? r.items : JSON.parse(r.items || '[]'), _id: r.id }));
     }
     renderRemindersMgmt();
   } catch(e) {}
