@@ -1973,6 +1973,14 @@ async function fetchWeeklySchedule() {
       const staffById = {};
       (cachedScheduleState.staff || []).forEach(s => { staffById[s.id] = s; });
 
+      // Build a set of called-out staff IDs per ISO date
+      const calledOutByDate = {}; // { "YYYY-MM-DD": Set of staffIds }
+      (cachedScheduleState.calledOut || []).forEach(co => {
+        if (!co.date) return; // skip old entries without a date
+        if (!calledOutByDate[co.date]) calledOutByDate[co.date] = new Set();
+        calledOutByDate[co.date].add(co.sid);
+      });
+
       // Build data rows from clients' permanent schedule, then apply overrides
       const data = [];
       (cachedScheduleState.clients || []).forEach(client => {
@@ -1996,6 +2004,12 @@ async function fetchWeeklySchedule() {
               const ov = overrides.find(o => o.day === day && parseInt(o.blockIdx,10) === blockIdx && o.date === dayIsoStr);
               if (ov) {
                 staffName = ov.staffId ? (staffById[ov.staffId]?.name || null) : null;
+                overridden = true;
+              }
+              // If the assigned staff is called out on this date, show as unassigned
+              const effectiveStaffId = ov ? (ov.staffId || null) : (blk.staffId || null);
+              if (effectiveStaffId && calledOutByDate[dayIsoStr]?.has(effectiveStaffId)) {
+                staffName = null;
                 overridden = true;
               }
             }

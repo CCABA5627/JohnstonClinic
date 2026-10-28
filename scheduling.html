@@ -1394,7 +1394,7 @@ function addPartialCallout(sid){
   if(!f?.value||!t?.value){showToast('Select both a from and to time',true);return;}
   if(t2m(f.value)>=t2m(t.value)){showToast('From must be before To',true);return;}
   S.calledOut=S.calledOut.filter(co=>co.sid!==sid||(co.fromM!==undefined&&!(t2m(f.value)<co.toM&&t2m(t.value)>co.fromM)));
-  S.calledOut.push({sid,fromM:t2m(f.value),toM:t2m(t.value)});
+  S.calledOut.push({sid,fromM:t2m(f.value),toM:t2m(t.value),date:todayISO()});
   render();showToast(`Partial callout added: ${f.value} \u2013 ${t.value}`,false);
 }
 function bestForSlot(cid,day,slot,excl){const pod=S.pods[cid]||[];const res=[];pod.forEach(sid=>{if(sid===excl||isStaffOutAt(sid,slot))return;const s=gsN(sid);if(!s)return;if((s.availability[day]||[]).includes(slot))res.push({sid,score:overlap(sid,cid)});});return res.sort((a,b)=>b.score-a.score);}
@@ -1919,11 +1919,11 @@ function mkCO(){
   const s=gsN(sid);
   const sub=askStaffCalloutSubtype(s?.name||sid);
   if(fromV&&toV&&t2m(fromV)<t2m(toV)){
-    S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV)});
+    S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV),date:todayISO()});
     logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} out ${fromV} \u2013 ${toV}`,false);
   } else {
-    S.calledOut.push({sid});
+    S.calledOut.push({sid,date:todayISO()});
     logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} marked out all day`,false);
   }
@@ -1934,7 +1934,7 @@ function logEvent(type,subtype,id,name){
   S.eventLog.push({date:new Date().toISOString().slice(0,10),type,subtype,id,name});
   markDirty();
 }
-function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);markDirty();render();showToast(`${s?.name||'Staff'} marked out all day`,false);}
+function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid,date:todayISO()});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);markDirty();render();showToast(`${s?.name||'Staff'} marked out all day`,false);}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);const s=gsN(sid);markDirty();render();showToast(`${s?.name||'Staff'} marked available`,false);}
 function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
 function mkClientCO2(cid){
