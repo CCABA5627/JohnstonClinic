@@ -1169,10 +1169,23 @@ function renderWeeklyChangesBox(data) {
       + '</div>'
       + '<div style="display:flex;flex-direction:column;gap:0;">'
       + s.items.map((ci, idx) => {
-          const sub = ci.sub ? '<div style="font-size:0.73rem;color:' + ci.color + ';opacity:.75;margin-top:1px;">' + ci.sub + '</div>' : '';
+          // Reformat legacy "Temp block – Temp block for X • Staff" -> "Staff covering X"
+          let displayText = ci.text;
+          if (ci.icon === '📌' && /^Temp block/i.test(displayText)) {
+            const clientMatch = displayText.match(/for\s+(.+)$/i);
+            const staffMatch = (ci.sub || '').match(/•\s*(.+?)(\s*•|$)/);
+            const clientName = clientMatch ? clientMatch[1].trim() : null;
+            const staffName = staffMatch ? staffMatch[1].trim() : null;
+            if (staffName && clientName) displayText = staffName + ' covering ' + clientName;
+            else if (clientName) displayText = clientName + ' (unassigned)';
+          }
+          const subText = (ci.icon === '📌' && /^Temp block/i.test(ci.text) && ci.sub)
+            ? ci.sub.replace(/\s*•\s*.+$/, '') // strip "• StaffName" from old format, keep time
+            : ci.sub;
+          const sub = subText ? '<div style="font-size:0.73rem;color:' + ci.color + ';opacity:.75;margin-top:1px;">' + subText + '</div>' : '';
           return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;background:' + ci.bg + ';' + (idx > 0 ? 'border-top:1px solid ' + ci.border + ';' : '') + '">'
             + '<span style="font-size:0.95rem;flex-shrink:0;margin-top:1px;">' + ci.icon + '</span>'
-            + '<div style="flex:1;min-width:0;font-size:0.81rem;color:' + ci.color + ';font-weight:500;">' + ci.text + sub + '</div>'
+            + '<div style="flex:1;min-width:0;font-size:0.81rem;color:' + ci.color + ';font-weight:500;">' + displayText + sub + '</div>'
             + '</div>';
         }).join('')
       + '</div></div>';
@@ -1197,10 +1210,23 @@ function renderTodaysChangesBox(data) {
   }
 
   inner.innerHTML = items.map(ci => {
-    const sub = ci.sub ? '<div style="font-size:0.75rem;color:' + ci.color + ';opacity:.75;margin-top:2px;">' + ci.sub + '</div>' : '';
+    // Reformat legacy "Temp block – Temp block for X • Staff" -> "Staff covering X"
+    let displayText = ci.text;
+    if (ci.icon === '📌' && /^Temp block/i.test(displayText)) {
+      const clientMatch = displayText.match(/for\s+(.+)$/i);
+      const staffMatch = (ci.sub || '').match(/•\s*(.+?)(\s*•|$)/);
+      const clientName = clientMatch ? clientMatch[1].trim() : null;
+      const staffName = staffMatch ? staffMatch[1].trim() : null;
+      if (staffName && clientName) displayText = staffName + ' covering ' + clientName;
+      else if (clientName) displayText = clientName + ' (unassigned)';
+    }
+    const subText = (ci.icon === '📌' && /^Temp block/i.test(ci.text) && ci.sub)
+      ? ci.sub.replace(/\s*•\s*.+$/, '')
+      : ci.sub;
+    const sub = subText ? '<div style="font-size:0.75rem;color:' + ci.color + ';opacity:.75;margin-top:2px;">' + subText + '</div>' : '';
     return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:10px;background:' + ci.bg + ';border:1px solid ' + ci.border + ';">'
       + '<span style="font-size:1rem;flex-shrink:0;margin-top:1px;">' + ci.icon + '</span>'
-      + '<div style="flex:1;min-width:0;font-size:0.83rem;color:' + ci.color + ';font-weight:500;">' + ci.text + sub + '</div>'
+      + '<div style="flex:1;min-width:0;font-size:0.83rem;color:' + ci.color + ';font-weight:500;">' + displayText + sub + '</div>'
       + '</div>';
   }).join('');
 
