@@ -1456,6 +1456,7 @@ function renderStaff() {
   staffList.forEach((s, i) => {
     const card = document.createElement('div');
     card.className = 'rbt-card';
+    card.setAttribute('data-staff-name', s.name);
     const facts = s.facts;
     const isOwnProfile = window._loggedInStaff && window._loggedInStaff === s.name;
     card.innerHTML = `
@@ -1467,17 +1468,26 @@ function renderStaff() {
         <div class="fun-fact"><span class="label">🍕 Fave food</span><span class="val">${facts.fave_food||'—'}</span></div>
         <div class="fun-fact"><span class="label">⭐ Fun fact</span><span class="val">${facts.fun_fact||'—'}</span></div>
       </div>
-      ${isOwnProfile ? '<div style="margin-top:10px;"><span style="display:inline-block;padding:5px 14px;border-radius:20px;background:var(--blue-light);color:var(--blue);font-size:0.76rem;font-weight:700;cursor:pointer;" data-edit-profile="'+i+'">✏️ Edit My Profile</span></div>' : ''}
+      ${isOwnProfile ? '<div style="margin-top:10px;"><span style="display:inline-block;padding:5px 14px;border-radius:20px;background:var(--blue-light);color:var(--blue);font-size:0.76rem;font-weight:700;cursor:pointer;" data-edit-profile="'+s.name+'">✏️ Edit My Profile</span></div>' : ''}
       <div style="margin-top:8px;font-size:0.78rem;color:var(--blue);font-weight:600;">Tap to see full profile →</div>`;
     grid.appendChild(card);
   });
-  // Event delegation for edit-profile button
+  // Event delegation — look up by name, not index, so order changes don't cause mismatches
   document.getElementById('rbt-grid').onclick = function(e) {
     var btn = e.target.closest('[data-edit-profile]');
-    if (btn) { e.stopPropagation(); openEditOwnProfile(parseInt(btn.getAttribute('data-edit-profile'))); return; }
-    // card click
+    if (btn) {
+      e.stopPropagation();
+      var name = btn.getAttribute('data-edit-profile');
+      var idx = staffList.findIndex(s => s.name === name);
+      if (idx >= 0) openEditOwnProfile(idx);
+      return;
+    }
     var card = e.target.closest('.rbt-card');
-    if (card) { var idx = Array.from(card.parentNode.children).indexOf(card); openRBTModal(idx); }
+    if (card) {
+      var name = card.getAttribute('data-staff-name');
+      var idx = staffList.findIndex(s => s.name === name);
+      if (idx >= 0) openRBTModal(idx);
+    }
   };
 }
 
