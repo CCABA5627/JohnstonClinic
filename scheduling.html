@@ -1214,6 +1214,7 @@ function computePortalChanges(){
   getDayBlocks(today).forEach(bl=>{
     if(bl.isTemp)return;
     const c=gcN(bl.client.id);if(!c)return;
+    console.log('[changes] block:',c.name,'staffId:',bl.staffId,'splits:',JSON.stringify(bl.splits));
     const permBlocks=c.schedule[today]||[];
     const permBlock=permBlocks[bl.blockIdx];
     const permStaffId=permBlock?.staffId||null;
