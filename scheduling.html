@@ -1246,14 +1246,7 @@ function computeWeeklyChanges(weekOff){
     const ovList2=S.clientOverrides||{};
     const stOvList2=S.staffOverrides||{};
 
-    // 1. Staff callouts for this day
-    S.calledOut.forEach(co=>{
-      const s=gsN(co.sid);if(!s)return;
-      // callout applies if it has no date (recurring) or matches this iso
-      const applies=!co.date||co.date===iso;
-      if(applies)items.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:s.name+' called out',sub:coLabel(co)});
-    });
-    // 2. Client cancellations (today only — calledOutClients is always today)
+    // 1. Client cancellations (today only — calledOutClients is always today)
     if(iso===todayISO()){
       S.calledOutClients.forEach(cid=>{const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled',sub:''});});
     }
@@ -1297,9 +1290,7 @@ function computePortalChanges(){
   const today=todayDay();
   const iso=todayISO();
   const items=[];
-  // 1. Staff callouts
-  S.calledOut.forEach(co=>{const s=gsN(co.sid);if(!s)return;items.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:s.name+' called out',sub:coLabel(co)});});
-  // 2. Client cancellations
+  // 1. Client cancellations
   S.calledOutClients.forEach(cid=>{const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled today',sub:''});});
   // 3. Time overrides
   Object.entries(S.clientOverrides).forEach(([cid,ovList])=>{
