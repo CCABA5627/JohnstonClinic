@@ -1032,15 +1032,15 @@ function changePortalWeek(delta) {
   if (portalWeekOffset + delta < 0) return;
   portalWeekOffset += delta;
   updatePortalWeekNav();
-  updateWeeklyScheduleHeaders();
   if (cachedScheduleState) renderWeeklyChangesBox(cachedScheduleState);
+  fetchWeeklySchedule();
 }
 
 function goToPortalCurrentWeek() {
   portalWeekOffset = 0;
   updatePortalWeekNav();
-  updateWeeklyScheduleHeaders();
   if (cachedScheduleState) renderWeeklyChangesBox(cachedScheduleState);
+  fetchWeeklySchedule();
 }
 
 function updateWeeklyScheduleHeaders() {
@@ -1969,6 +1969,49 @@ async function fetchWeeklySchedule() {
       return;
     }
 
+    // Apply date-specific overrides from cachedScheduleState for the viewed week
+    // This handles future-week fill-in assignments and removals stored in schedule_state
+    if (cachedScheduleState && portalWeekOffset !== 0) {
+      const weekDates = getPortalWeekDates(portalWeekOffset);
+      const staffById = {};
+      (cachedScheduleState.staff || []).forEach(s => { staffById[s.id] = s; });
+      const clientsById = {};
+      (cachedScheduleState.clients || []).forEach(c => { clientsById[c.id] = c; });
+
+      // Build a map: "clientName|day|startTime" -> override staff name (null = removed)
+      const overrideMap = {}; // key -> staffName or null
+
+      // Apply staffOverrides
+      Object.entries(cachedScheduleState.staffOverrides || {}).forEach(([cid, ovList]) => {
+        if (!Array.isArray(ovList)) return;
+        const client = clientsById[cid];
+        if (!client) return;
+        ovList.forEach(ov => {
+          const dayIso = weekDates[ov.day];
+          if (!dayIso) return;
+          const dayIsoStr = dayIso.toISOString().slice(0,10);
+          if (ov.date !== dayIsoStr) return;
+          // Find the block's start time
+          const blk = (client.schedule[ov.day] || [])[parseInt(ov.blockIdx, 10)];
+          if (!blk) return;
+          const key = (client.name||'') + '|' + ov.day + '|' + blk.from;
+          const newStaff = ov.staffId ? (staffById[ov.staffId]?.name || null) : null;
+          overrideMap[key] = newStaff; // null means removed
+        });
+      });
+
+      // Apply overrideMap to the data rows
+      if (Object.keys(overrideMap).length) {
+        data.forEach(r => {
+          const key = (r.client_name||'') + '|' + r.day + '|' + (r.start_time||'');
+          if (key in overrideMap) {
+            r.staff_name = overrideMap[key]; // null = removed/unassigned
+            r._overridden = true;
+          }
+        });
+      }
+    }
+
     // Group by day, then by time slot
     var byDaySlot = {};
     DAYS_ORDER.forEach(function(d) {
@@ -2058,9 +2101,12 @@ async function fetchWeeklySchedule() {
           var entry = dayClientMap[d][clientKey];
           html += '<td style="padding:3px 5px;' + subBorder + 'border-right:1px solid ' + borderColor + ';background:' + (isToday ? 'rgba(74,144,217,0.03)' : '#fff') + ';vertical-align:middle;">';
           if(entry) {
+            var staffDisplay = entry.staff_name;
+            var staffLabel = staffDisplay ? '👤 ' + staffDisplay : '<span style="color:#aaa;font-style:italic;">Unassigned</span>';
+            var overrideBadge = entry._overridden ? '<span style="font-size:0.58rem;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 4px;margin-left:3px;">fill-in</span>' : '';
             html += '<div style="background:' + col.bg + ';border-left:3px solid ' + col.border + ';border-radius:5px;padding:4px 6px;">'
               + '<div style="font-weight:700;color:' + col.text + ';">' + clientKey + '</div>'
-              + '<div style="color:#555;font-size:0.68rem;">👤 ' + (entry.staff_name || '—') + '</div>'
+              + '<div style="color:#555;font-size:0.68rem;">' + staffLabel + overrideBadge + '</div>'
               + '<div style="color:#888;font-size:0.65rem;">' + (entry.start_time || '') + (entry.end_time ? '–' + entry.end_time : '') + '</div>'
               + '</div>';
           } else {
