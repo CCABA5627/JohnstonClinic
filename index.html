@@ -2572,8 +2572,9 @@ function showStaffApp(name) {
   if (note) note.textContent = 'Your responses will be saved under this name.';
   // Re-render if coverage tab is open
   renderCoverageRequests();
-  // Store for Staff Profile editing
+  // Store for Staff Profile editing, then re-render so edit button appears
   window._loggedInStaff = name;
+  renderStaff();
 }
 
 function populateCoverageWho() {
