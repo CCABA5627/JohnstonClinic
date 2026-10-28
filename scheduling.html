@@ -1625,9 +1625,13 @@ function rToday(){
       if(!seenSubs.has(key)){
         seenSubs.add(key);
         const permName=permStaffId?gsN(permStaffId)?.name:null;
+        // If this staff has a split entry, show their actual covered range, not the full block
+        const mySplit=bl.splits&&bl.splits.find(sp=>sp.sid===bl.staffId);
+        const dispFrom=mySplit?mySplit.from:bl.from;
+        const dispTo=mySplit?mySplit.to:bl.to;
         changeItems.push({icon:'🔄',color:'#185FA5',bg:'#E6F1FB',border:'#85B7EB',
           text:'<strong>'+sub.name+'</strong> covering <strong>'+c.name+'</strong>',
-          sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+bl.from+'–'+bl.to,
+          sub:(permName?'Usually: '+permName+' • ':'Not their regular client • ')+dispFrom+'–'+dispTo,
           undo:{type:'staff-assign',cid:c.id,day:today,blockIdx:bl.blockIdx,label:'Remove assignment'}});
       }
     }
