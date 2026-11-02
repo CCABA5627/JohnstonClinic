@@ -1165,9 +1165,12 @@ function applyState(p){
   S.pods=p.pods||S.pods;
   S.tempBlocks=p.tempBlocks||[];
   const today=todayISO();
-  // Strip callout entries that are from a past date (or legacy entries with no date — they were today-only and stale)
-  S.calledOut=(p.calledOut||[]).filter(co=>!co.date||co.date===today);
-  S.calledOutClients=(p.calledOutClients||[]).filter(co=>{const d=co.date||(typeof co==='string'?null:null);return !d||d===today;});
+  // Strip callout entries from past dates (or legacy undated entries — those were always today-only)
+  const rawCalledOut=p.calledOut||[];
+  const rawCalledOutClients=p.calledOutClients||[];
+  S.calledOut=rawCalledOut.filter(co=>co.date===today);
+  S.calledOutClients=rawCalledOutClients.filter(co=>(co.date||null)===today);
+  const stalePurged=(S.calledOut.length!==rawCalledOut.length)||(S.calledOutClients.length!==rawCalledOutClients.length);
   // Migrate clientOverrides from old {cid:{day,from,to}} to new {cid:[{blockIdx,day,from,to}]}
   const rawOv = p.clientOverrides || {};
   const migratedOv = {};
@@ -1187,7 +1190,7 @@ function applyState(p){
   S.selClient=S.clients[0]?.id||null;
   S.selStaff=S.staff[0]?.id||null;
   S.lastSaved=p.savedAt||null;
-  S.dirty=false;
+  S.dirty=stalePurged; // if we dropped stale callouts, save immediately to clean the DB
   S.selDaysS=initSDS(S.staff);
   updSI();
 }
@@ -1212,6 +1215,7 @@ async function tryLoad(){
         // Update local cache
         try{localStorage.setItem(SK,JSON.stringify(p));}catch(e){}
         showToast('Schedule loaded from cloud',false);
+        if(S.dirty)markDirty(); // stale callouts were purged — save clean state back
       }
     }
   }catch(e){
