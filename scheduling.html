@@ -308,7 +308,7 @@ async function pushToPortal() {
     const rows = [];
 
     S.clients.forEach(c => {
-      if(S.calledOutClients.includes(c.id)) return;
+      if(isClientOut(c.id)) return;
       (c.schedule[todayDay] || []).forEach(blk => {
         if(blk.splits && blk.splits.length) {
           blk.splits.forEach(sp => {
@@ -628,6 +628,9 @@ function clearClientOverride(cid,day,blockIdx){
   showToast('Override cleared — back to regular schedule',false);
 }
 
+// calledOutClients entries: {cid, date} or legacy string cid — date absent = always on
+function isClientOut(cid,forDate){const d=forDate||todayISO();return S.calledOutClients.some(co=>{const id=co.cid||co;return id===cid&&(!co.date||co.date===d);});}
+
 // calledOut entries: {sid, fromM?, toM?}  — fromM/toM in minutes; if absent = all day
 function isStaffOut(sid,forDate){const d=forDate||todayISO();return S.calledOut.some(co=>co.sid===sid&&co.fromM===undefined&&(!co.date||co.date===d));}
 function isStaffOutAt(sid,slotTime,forDate){
@@ -671,7 +674,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   function chkConflict(sid,newSlots,excCid,excBlockIdx,excTempId){
     const conflicts=[];const ns=new Set(newSlots);
     S.clients.forEach(cl=>{
-      if(S.calledOutClients.includes(cl.id))return;
+      if(isClientOut(cl.id,targetDate))return;
       getEffectiveBlocks(cl.id,day).forEach((blk,idx)=>{
         if(blk.staffId!==sid)return;
         if(cl.id===excCid&&idx===excBlockIdx)return;
@@ -682,7 +685,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     (S.tempBlocks||[]).forEach(tb=>{
       if(tb.staffId!==sid||tb.day!==day)return;
       if(tb.id===excTempId)return;
-      if(S.calledOutClients.includes(tb.cid))return;
+      if(isClientOut(tb.cid,targetDate))return;
       const ov=tb.slots.filter(s=>ns.has(s));
       if(ov.length>0)conflicts.push({name:gcN(tb.cid)?.name||'?',from:tb.from,to:tb.to});
     });
@@ -764,7 +767,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const result=[];
     const blockSlotsSet=new Set(slots);
     S.clients.forEach(cl=>{
-      if(S.calledOutClients.includes(cl.id))return;
+      if(isClientOut(cl.id,targetDate))return;
       getEffectiveBlocks(cl.id,day).forEach((eb,idx)=>{
         if(!eb.staffId)return;
         // Check splits too
@@ -1248,9 +1251,9 @@ function computeWeeklyChanges(weekOff){
     const ovList2=S.clientOverrides||{};
     const stOvList2=S.staffOverrides||{};
 
-    // 1. Client cancellations (today only — calledOutClients is always today)
-    if(iso===todayISO()){
-      S.calledOutClients.forEach(cid=>{const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled',sub:''});});
+    // 1. Client cancellations (only show on the day they are cancelled)
+    if(isClientOut&&S.calledOutClients.some(co=>(!co.date&&iso===todayISO())||(co.date===iso))){
+      S.calledOutClients.filter(co=>{const d=co.date||todayISO();return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled',sub:''});});
     }
     // 3. Time overrides for this day
     Object.entries(ovList2).forEach(([cid,ovList])=>{
@@ -1293,8 +1296,8 @@ function computePortalChanges(){
   const today=todayDay();
   const iso=todayISO();
   const items=[];
-  // 1. Client cancellations
-  S.calledOutClients.forEach(cid=>{const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled today',sub:''});});
+  // 1. Client cancellations (today only)
+  S.calledOutClients.filter(co=>{const d=co.date||iso;return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled today',sub:''});});
   // 3. Time overrides
   Object.entries(S.clientOverrides).forEach(([cid,ovList])=>{
     if(!Array.isArray(ovList))return;
@@ -1390,9 +1393,9 @@ function gcN(id){return S.clients.find(c=>c.id===id);}
 function gsN(id){return S.staff.find(s=>s.id===id);}
 function overlap(sid,cid){const c=gcN(cid),s=gsN(sid);if(!c||!s)return 0;let o=0;DAYS.forEach(d=>{const cs=new Set((c.schedule[d]||[]).flatMap(blk=>slotsInBlock(blk.from,blk.to)));(s.availability[d]||[]).forEach(t=>{if(cs.has(t))o++;});});return o;}
 function getStaffDaySlots(sid,day){const slots=new Set();S.clients.forEach(c=>{(c.schedule[day]||[]).forEach(blk=>{if(blk.staffId===sid)slotsInBlock(blk.from,blk.to).forEach(s=>slots.add(s));});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId===sid&&tb.day===day)tb.slots.forEach(s=>slots.add(s));});return slots;}
-function checkConflict(sid,day,newSlots,excludeCid,excludeBlockIdx,excludeTempId){const conflicts=[];const newSet=new Set(newSlots);S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach((blk,idx)=>{if(blk.staffId!==sid)return;if(c.id===excludeCid&&idx===excludeBlockIdx)return;const overlap=slotsInBlock(blk.from,blk.to).filter(s=>newSet.has(s));if(overlap.length>0)conflicts.push({name:c.name,from:blk.from,to:blk.to});});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId!==sid||tb.day!==day)return;if(tb.id===excludeTempId)return;if(S.calledOutClients.includes(tb.cid))return;// don't count cancelled client's temp blocks as conflicts
+function checkConflict(sid,day,newSlots,excludeCid,excludeBlockIdx,excludeTempId){const conflicts=[];const newSet=new Set(newSlots);S.clients.forEach(c=>{if(isClientOut(c.id))return;getEffectiveBlocks(c.id,day).forEach((blk,idx)=>{if(blk.staffId!==sid)return;if(c.id===excludeCid&&idx===excludeBlockIdx)return;const overlap=slotsInBlock(blk.from,blk.to).filter(s=>newSet.has(s));if(overlap.length>0)conflicts.push({name:c.name,from:blk.from,to:blk.to});});});(S.tempBlocks||[]).forEach(tb=>{if(tb.staffId!==sid||tb.day!==day)return;if(tb.id===excludeTempId)return;if(isClientOut(tb.cid))return;// don't count cancelled client's temp blocks as conflicts
 const overlap=tb.slots.filter(s=>newSet.has(s));if(overlap.length>0)conflicts.push({name:gcN(tb.cid)?.name||'?'+' (temp)',from:tb.from,to:tb.to});});return{hasConflict:conflicts.length>0,conflicts};}
-function getConflictingStaffOnDay(day){const staffSlots={};S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day).forEach(blk=>{if(!blk.staffId)return;if(!staffSlots[blk.staffId])staffSlots[blk.staffId]=[];staffSlots[blk.staffId].push({slots:new Set(slotsInBlock(blk.from,blk.to)),from:blk.from,to:blk.to,name:c.name});});});(S.tempBlocks||[]).forEach(tb=>{if(!tb.staffId||tb.day!==day)return;if(S.calledOutClients.includes(tb.cid))return;// skip cancelled client temp blocks
+function getConflictingStaffOnDay(day,viewIso){const staffSlots={};S.clients.forEach(c=>{if(isClientOut(c.id,viewIso||todayISO()))return;getEffectiveBlocks(c.id,day).forEach(blk=>{if(!blk.staffId)return;if(!staffSlots[blk.staffId])staffSlots[blk.staffId]=[];staffSlots[blk.staffId].push({slots:new Set(slotsInBlock(blk.from,blk.to)),from:blk.from,to:blk.to,name:c.name});});});(S.tempBlocks||[]).forEach(tb=>{if(!tb.staffId||tb.day!==day)return;if(isClientOut(tb.cid,viewIso||todayISO()))return;// skip cancelled client temp blocks
 if(!staffSlots[tb.staffId])staffSlots[tb.staffId]=[];staffSlots[tb.staffId].push({slots:new Set(tb.slots),from:tb.from,to:tb.to,name:(gcN(tb.cid)?.name||'?')+' (temp)'});});const conflicting=new Set();Object.entries(staffSlots).forEach(([sid,blocks])=>{for(let i=0;i<blocks.length;i++){for(let j=i+1;j<blocks.length;j++){const overlap=[...blocks[i].slots].some(s=>blocks[j].slots.has(s));if(overlap){conflicting.add(sid);break;}}}});return conflicting;}
 function addPartialCallout(sid){
   const f=document.getElementById('co-partial-from');const t=document.getElementById('co-partial-to');
@@ -1406,8 +1409,8 @@ function bestForSlot(cid,day,slot,excl){const pod=S.pods[cid]||[];const res=[];p
 function todayDay(){const d=ALL_DAYS[new Date().getDay()];return DAYS.includes(d)?d:DAYS[0];}
 function go(t){S.tab=t;document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));render();}
 function fmtBlock(blk){return blk.from+(blk.from!==blk.to?' \u2013 '+blk.to:'');}
-function getDayBlocks(day,viewIso){const out=[];S.clients.forEach(c=>{if(S.calledOutClients.includes(c.id))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
-out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:S.calledOutClients.includes(tb.cid)});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
+function getDayBlocks(day,viewIso){const out=[];S.clients.forEach(c=>{if(isClientOut(c.id,viewIso||todayISO()))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
+out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:isClientOut(tb.cid,viewIso||todayISO())});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
 
 function getPartialGaps(bl,day,forDate){
   // No staff at all \u2014 not a partial gap, it's fully uncovered (handled separately)
@@ -1465,8 +1468,8 @@ function rToday(){
   if(!S.todayFilter)S.todayFilter='all';
   const today=S.selectedDay; const realToday=todayDay();
   const selectedDayISO=isoForDay(today,S.weekOffset||0)||todayISO();
-  const blocks=getDayBlocks(today);
-  const todayConflicts=getConflictingStaffOnDay(today);
+  const blocks=getDayBlocks(today,selectedDayISO);
+  const todayConflicts=getConflictingStaffOnDay(today,selectedDayISO);
 
   // Categorize blocks
   const needsCoverage=[],conflictBlocks=[],partialBlocks=[],coveredBlocks=[],tempBlocks=[];
@@ -1583,9 +1586,9 @@ function rToday(){
     changeItems.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:'<strong>'+s.name+'</strong> called out',sub:coLabel(co),
       undo:{type:'staff-callout',sid:co.sid,label:'Restore '+s.name}});
   });
-  // 2. Client cancellations
-  S.calledOutClients.forEach(cid=>{
-    const c=gcN(cid);if(!c)return;
+  // 2. Client cancellations (only show today's)
+  S.calledOutClients.filter(co=>{const d=co.date||iso;return d===iso;}).forEach(co=>{
+    const cid=co.cid||co;const c=gcN(cid);if(!c)return;
     changeItems.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:'<strong>'+c.name+'</strong> cancelled today',
       undo:{type:'client-cancel',cid,label:'Restore '+c.name}});
   });
@@ -1745,7 +1748,7 @@ function rToday(){
     </div>
     <div class="ss">
       <div class="sl">📵 Client Cancellation</div>
-      <select id="client-co-sel" style="margin-bottom:6px;"><option value="">Select client…</option>${S.clients.map(c=>`<option value="${c.id}"${S.calledOutClients.includes(c.id)?' disabled':''}>${c.name}${S.calledOutClients.includes(c.id)?' (cancelled)':''}</option>`).join('')}</select>
+      <select id="client-co-sel" style="margin-bottom:6px;"><option value="">Select client…</option>${S.clients.map(c=>`<option value="${c.id}"${isClientOut(c.id)?' disabled':''}>${c.name}${isClientOut(c.id)?' (cancelled)':''}</option>`).join('')}</select>
       <button class="btn" style="width:100%;background:#534AB7;color:#fff;border-color:#534AB7;" onclick="mkClientCO()">Mark Cancelled</button>
     </div>
     <div class="ss" style="border-left:3px solid #EF9F27;">
@@ -1888,12 +1891,12 @@ function rCallout(){
   const hasOverride=(S.clientOverrides[S.calloutClient]||[]).length>0;
   const ovList=S.clientOverrides[S.calloutClient]||[];
   const overrideUI=`<div style="margin-top:10px;padding:10px;background:#FFF8EC;border:1px solid #EF9F27;border-radius:8px;"><div style="font-size:11px;font-weight:700;color:#b87a00;margin-bottom:6px;">📅 Today-only time adjustment</div>${hasOverride?`<div style="font-size:12px;color:#b87a00;margin-bottom:8px;">${ovList.map(o=>`Block adjusted: <strong>${o.from} – ${o.to}</strong>`).join('<br>')}</div><button class="btn btn-sm" onclick="clearClientOverride('${S.calloutClient}')">✕ Clear all overrides</button>`:`<div style="font-size:11px;color:#888;margin-bottom:6px;">Use the Today tab sidebar "📅 Today-only schedule adjust" section to adjust individual blocks.</div>`}</div>`;
-  const isCancelled=S.calledOutClients.includes(S.calloutClient);
+  const isCancelled=isClientOut(S.calloutClient);
   let freedStaff=[];
   if(isCancelled&&selC){const freedSlots={};DAYS.forEach(d=>{(selC.schedule[d]||[]).forEach(blk=>{if(!blk.staffId)return;if(!freedSlots[blk.staffId])freedSlots[blk.staffId]=[];freedSlots[blk.staffId].push({day:d,from:blk.from,to:blk.to});});});freedStaff=Object.entries(freedSlots).map(([sid,slots])=>({sid,slots,name:gsN(sid)?.name||'?'}));}
-  const mobClientPicker=isMob?`<div style="margin-bottom:1rem;"><label style="font-size:11px;font-weight:600;color:#888;display:block;margin-bottom:4px;">Select client:</label><select style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #ccc;background:#fff;" onchange="S.calloutClient=this.value;render()"><option value="">&#8212; choose a client &#8212;</option>${S.clients.map(c=>{const isCan=S.calledOutClients.includes(c.id);return'<option value="'+c.id+'"'+(S.calloutClient===c.id?' selected':'')+'>'+c.name+(isCan?' (cancelled)':'')+'</option>';}).join('')}</select></div>`:'';
+  const mobClientPicker=isMob?`<div style="margin-bottom:1rem;"><label style="font-size:11px;font-weight:600;color:#888;display:block;margin-bottom:4px;">Select client:</label><select style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #ccc;background:#fff;" onchange="S.calloutClient=this.value;render()"><option value="">&#8212; choose a client &#8212;</option>${S.clients.map(c=>{const isCan=isClientOut(c.id);return'<option value="'+c.id+'"'+(S.calloutClient===c.id?' selected':'')+'>'+c.name+(isCan?' (cancelled)':'')+'</option>';}).join('')}</select></div>`:'';
   const clientContent=!S.calloutClient?`<div class="es">Select a client${isMob?' above':' from the list'} to manage their today settings</div>`:`<div class="cob" style="background:#F0F0FE;border-color:#AFA9EC;"><div class="cot" style="color:#3C3489;">📵 ${selC?.name}</div><div style="font-size:12px;color:#534AB7;margin-bottom:.625rem">Cancelling removes all their sessions from Today's view and frees up their assigned staff.</div><div style="display:flex;gap:6px">${isCancelled?`<button class="btn btn-sm" onclick="rmClientCO('${S.calloutClient}')">✓ Restore — mark as attending</button>`:`<button class="btn btn-sm" style="background:#534AB7;color:#fff;border-color:#534AB7" onclick="mkClientCO2('${S.calloutClient}')">Mark ${selC?.name} as cancelled today</button>`}</div>${!isCancelled?overrideUI:''}</div>${isCancelled&&freedStaff.length>0?`<div class="card"><div class="ch"><div class="ct">🟢 Staff now freed up</div></div><p style="font-size:12px;color:#888;margin-bottom:.75rem">These staff members had sessions with ${selC?.name} and are now available.</p>${freedStaff.map(f=>`<div style="padding:10px 0;border-bottom:0.5px solid rgba(0,0,0,.1)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div class="av av-s" style="width:28px;height:28px">${ini(f.name)}</div><strong style="font-size:13px">${f.name}</strong></div><div style="display:flex;flex-wrap:wrap;gap:5px">${f.slots.map(sl=>`<span style="background:#E1F5EE;color:#085041;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600">${sl.day} ${sl.from} – ${sl.to} — now free</span>`).join('')}</div></div>`).join('')}</div>`:''}${!isCancelled?`<div class="card"><div class="ch"><div class="ct">Scheduled sessions for ${selC?.name}</div></div>${DAYS.map(d=>{const blocks=selC?.schedule[d]||[];if(!blocks.length)return'';return`<div style="padding:6px 0;border-bottom:0.5px solid rgba(0,0,0,.08)"><strong style="font-size:11px;color:#534AB7">${d}</strong><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:5px">${blocks.map(blk=>`<span style="background:#E6F1FB;color:#185FA5;padding:2px 9px;border-radius:8px;font-size:11px">${blk.from} – ${blk.to}${blk.staffId?' — '+gsN(blk.staffId)?.name:' — unassigned'}</span>`).join('')}</div></div>`;}).join('')||'<div style="font-size:12px;color:#888">No scheduled sessions.</div>'}</div>`:''}`;
-  return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Clients</div>${S.clients.map(c=>{const cancelled=S.calledOutClients.includes(c.id);const hasOv=(S.clientOverrides[c.id]||[]).length>0;return`<div class="si2 ${S.calloutClient===c.id?'sel':''}" onclick="S.calloutClient='${c.id}';render()"><div class="av av-c">${ini(c.name)}</div><span class="nm">${c.name}</span>${cancelled?'<span class="bx" style="background:#EEEDFE;color:#3C3489">Cancelled</span>':hasOv?'<span class="bx" style="background:#FFF8EC;color:#b87a00">Adjusted</span>':''}</div>`;}).join('')}</div></div><div class="content">${modeBtns}${mobClientPicker}${clientContent}</div></div>`;
+  return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">Clients</div>${S.clients.map(c=>{const cancelled=isClientOut(c.id);const hasOv=(S.clientOverrides[c.id]||[]).length>0;return`<div class="si2 ${S.calloutClient===c.id?'sel':''}" onclick="S.calloutClient='${c.id}';render()"><div class="av av-c">${ini(c.name)}</div><span class="nm">${c.name}</span>${cancelled?'<span class="bx" style="background:#EEEDFE;color:#3C3489">Cancelled</span>':hasOv?'<span class="bx" style="background:#FFF8EC;color:#b87a00">Adjusted</span>':''}</div>`;}).join('')}</div></div><div class="content">${modeBtns}${mobClientPicker}${clientContent}</div></div>`;
 }
 function rData(){const tab=S.edTab||'clients';if(!S.edSelClient&&S.clients.length)S.edSelClient=S.clients[0].id;return`<div style="width:100%"><div class="sidebar"><div class="ss"><div class="sl">What to edit</div><div class="si2 ${tab==='clients'?'sel':''}" onclick="setET('clients')"><span class="nm">Clients &amp; schedules</span></div><div class="si2 ${tab==='staff'?'sel':''}" onclick="setET('staff')"><span class="nm">Staff &amp; availability</span></div></div><div class="ss"><div class="sl">How it works</div><div style="font-size:11px;color:#888;line-height:1.7">${tab==='clients'?'Select a client, click a day to activate it, then use <strong>+ Add block</strong> to set time ranges and assign staff. Add multiple blocks for split shifts.':'Click a time to start a range, click another to fill all 15-min slots between.'}</div></div><div class="ss"><button class="btn btn-g" style="width:100%" onclick="doSave(false)">Save now</button></div></div><div class="content">${tab==='clients'?rEDClients():rES()}</div></div>`;}
 
@@ -1942,15 +1945,15 @@ function logEvent(type,subtype,id,name){
 }
 function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid,date:todayISO()});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);markDirty();render();showToast(`${s?.name||'Staff'} marked out all day`,false);}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);const s=gsN(sid);markDirty();render();showToast(`${s?.name||'Staff'} marked available`,false);}
-function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!isClientOut(cid))S.calledOutClients.push({cid,date:todayISO()});logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
 function mkClientCO2(cid){
   const c=gcN(cid);
   const sub=confirm('Who initiated this cancellation?\n\nOK = Client called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';
-  if(!S.calledOutClients.includes(cid))S.calledOutClients.push(cid);
+  if(!isClientOut(cid))S.calledOutClients.push({cid,date:todayISO()});
   logEvent('client-cancel',sub,cid,c?.name||cid);
   markDirty();render();showToast(`Client cancelled — sessions removed`,false);
 }
-function rmClientCO(cid){S.calledOutClients=S.calledOutClients.filter(c=>c!==cid);markDirty();render();showToast(`Client restored — sessions back on schedule`,false);}
+function rmClientCO(cid){S.calledOutClients=S.calledOutClients.filter(c=>(c.cid||c)!==cid);markDirty();render();showToast(`Client restored — sessions back on schedule`,false);}
 var _lastCancelSubtype;
 function renderTodayOverrideBlocks(){
   const cid=document.getElementById('tod-client-sel')?.value;
