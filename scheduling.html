@@ -643,7 +643,7 @@ function isStaffOutAt(sid,slotTime,forDate){
     return m>=co.fromM&&m<co.toM;
   });
 }
-function getStaffCallout(sid){return S.calledOut.filter(co=>co.sid===sid);}
+function getStaffCallout(sid,forDate){const d=forDate||todayISO();return S.calledOut.filter(co=>co.sid===sid&&(!co.date||co.date===d));}
 function coLabel(co){
   if(co.fromM===undefined)return'all day';
   function mToT(m){const hr=Math.floor(m/60);const mn=m%60;const ap=hr<12?'AM':'PM';const h12=hr===0?12:hr>12?hr-12:hr;return`${h12}:${mn===0?'00':mn} ${ap}`;}
@@ -694,7 +694,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
 
   // If primary staff has a partial callout, auto-convert to splits so popup reflects reality
   if(blk&&blk.staffId&&!blk.splits){
-    const staffCOs=getStaffCallout(blk.staffId);
+    const staffCOs=getStaffCallout(blk.staffId,targetDate);
     const hasPartialCO=staffCOs.some(co=>co.fromM!==undefined);
     if(hasPartialCO){
       // Build splits: staff covers only the slots they are NOT called out for
@@ -719,7 +719,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   const alreadyCoveredSlots=new Set();
   if(blk?.splits){
     blk.splits.forEach(sp=>{
-      const spCOs=getStaffCallout(sp.sid);
+      const spCOs=getStaffCallout(sp.sid,targetDate);
       const calledOutM=new Set();
       spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
       slotsInBlock(sp.from,sp.to).forEach(sl=>{
@@ -727,7 +727,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
       });
     });
   } else if(blk?.staffId){
-    const staffCOs=getStaffCallout(blk.staffId);
+    const staffCOs=getStaffCallout(blk.staffId,targetDate);
     const calledOutM=new Set();
     staffCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
     if(!staffCOs.some(co=>co.fromM===undefined)){
@@ -845,7 +845,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const blockSlots=blk.isTemp?blk.slots:slotsInBlock(blockFrom,blockTo);
     const coveredSlots=new Set();
     splits.forEach(sp=>{
-      const spCOs=getStaffCallout(sp.sid);
+      const spCOs=getStaffCallout(sp.sid,targetDate);
       const calledOutM=new Set();
       spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
       slotsInBlock(sp.from,sp.to).forEach(sl=>{if(blockSlots.includes(sl)&&!calledOutM.has(t2m(sl)))coveredSlots.add(sl);});
@@ -857,7 +857,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     currentCoverageHtml=`<div style="background:#E1F5EE;border:1px solid #5DCAA5;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
       <div style="font-size:11px;font-weight:700;color:#085041;margin-bottom:6px;">Current coverage</div>
       ${splits.map(sp=>{
-        const spCOs=getStaffCallout(sp.sid);
+        const spCOs=getStaffCallout(sp.sid,targetDate);
         const partialOut=spCOs.filter(co=>co.fromM!==undefined);
         const coNote=partialOut.length?`<span style="font-size:10px;color:#b87a00;margin-left:4px;">(out ${partialOut.map(co=>coLabel(co)).join(', ')})</span>`:'';
         return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
@@ -1431,7 +1431,7 @@ function getPartialGaps(bl,day,forDate){
     // Split block \u2014 check each split staff member individually
     bl.splits.forEach(sp=>{
       if(isStaffOut(sp.sid,forDate))return; // all-day callout \u2014 covers nothing
-      const spCOs=getStaffCallout(sp.sid);
+      const spCOs=getStaffCallout(sp.sid,forDate);
       const calledOutM=new Set();
       spCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
       slotsInBlock(sp.from,sp.to).forEach(sl=>{
@@ -1441,7 +1441,7 @@ function getPartialGaps(bl,day,forDate){
   } else if(bl.staffId){
     // Single staff \u2014 if all-day callout, nothing is covered
     if(isStaffOut(bl.staffId,forDate))return null; // show as "called out" not partial gap
-    const staffCOs=getStaffCallout(bl.staffId);
+    const staffCOs=getStaffCallout(bl.staffId,forDate);
     const calledOutM=new Set();
     staffCOs.forEach(co=>{if(co.fromM!==undefined)for(let m=co.fromM;m<co.toM;m+=15)calledOutM.add(m);});
     // All slots in the block are covered unless staff is partially called out during them
@@ -1586,8 +1586,8 @@ function rToday(){
   // Build "Today's Changes" summary — auto-detects non-standard assignments and times
   const iso=todayISO();
   const changeItems=[];
-  // 1. Staff callouts
-  S.calledOut.forEach(co=>{
+  // 1. Staff callouts (only show for the selected day)
+  S.calledOut.filter(co=>!co.date||co.date===selectedDayISO).forEach(co=>{
     const s=gsN(co.sid);if(!s)return;
     changeItems.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:'<strong>'+s.name+'</strong> called out',sub:coLabel(co),
       undo:{type:'staff-callout',sid:co.sid,label:'Restore '+s.name}});
@@ -1819,10 +1819,11 @@ function rWeek(){
     const isToday=isCurrentWeek&&d===todayDayStr;
     const dateStr=fmtWeekDate(weekDates[d]);
     const inner=blocks.length===0?`<div style="padding:8px;font-size:11px;color:#888">No sessions</div>`:blocks.map(bl=>{
-      const co=bl.staffId&&S.calledOut.some(c=>c.sid===bl.staffId&&(c.fromM===undefined||(t2m(bl.from)>=c.fromM&&t2m(bl.from)<c.toM)));
-      const dayConflicts=getConflictingStaffOnDay(d);
+      const dayIso=isoForDay(d,offset);
+      const co=bl.staffId&&S.calledOut.some(c=>c.sid===bl.staffId&&(!c.date||c.date===dayIso)&&(c.fromM===undefined||(t2m(bl.from)>=c.fromM&&t2m(bl.from)<c.toM)));
+      const dayConflicts=getConflictingStaffOnDay(d,dayIso);
       const hasConflict=bl.staffId&&dayConflicts.has(bl.staffId)&&!co;
-      const gaps=getPartialGaps(bl,d);
+      const gaps=getPartialGaps(bl,d,dayIso);
       const cls=bl.isTemp?'wtmp':co?'wco':hasConflict?'wconflict':gaps?'wpartial':bl.staffId?'wa':'wu';
       let sname;
       if(!bl.staffId){sname='Tap to assign';}
