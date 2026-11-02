@@ -1164,8 +1164,10 @@ function applyState(p){
   S.staff=p.staff||S.staff;
   S.pods=p.pods||S.pods;
   S.tempBlocks=p.tempBlocks||[];
-  S.calledOut=p.calledOut||[];
-  S.calledOutClients=p.calledOutClients||[];
+  const today=todayISO();
+  // Strip callout entries that are from a past date (or legacy entries with no date — they were today-only and stale)
+  S.calledOut=(p.calledOut||[]).filter(co=>!co.date||co.date===today);
+  S.calledOutClients=(p.calledOutClients||[]).filter(co=>{const d=co.date||(typeof co==='string'?null:null);return !d||d===today;});
   // Migrate clientOverrides from old {cid:{day,from,to}} to new {cid:[{blockIdx,day,from,to}]}
   const rawOv = p.clientOverrides || {};
   const migratedOv = {};
