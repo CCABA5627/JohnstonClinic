@@ -1592,8 +1592,8 @@ function rToday(){
     changeItems.push({icon:'🚨',color:'#993C1D',bg:'#FFF3EE',border:'#F0997B',text:'<strong>'+s.name+'</strong> called out',sub:coLabel(co),
       undo:{type:'staff-callout',sid:co.sid,label:'Restore '+s.name}});
   });
-  // 2. Client cancellations (only show today's)
-  S.calledOutClients.filter(co=>{const d=co.date||iso;return d===iso;}).forEach(co=>{
+  // 2. Client cancellations (only show for the selected day)
+  S.calledOutClients.filter(co=>{const d=co.date||selectedDayISO;return d===selectedDayISO;}).forEach(co=>{
     const cid=co.cid||co;const c=gcN(cid);if(!c)return;
     changeItems.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:'<strong>'+c.name+'</strong> cancelled today',
       undo:{type:'client-cancel',cid,label:'Restore '+c.name}});
@@ -1601,7 +1601,7 @@ function rToday(){
   // 3. Today-only time adjustments (client coming at different time than scheduled)
   Object.entries(S.clientOverrides).forEach(([cid,ovList])=>{
     if(!Array.isArray(ovList))return;
-    const todayOvs=ovList.filter(o=>o.date===iso||(o.day===today&&!o.date));
+    const todayOvs=ovList.filter(o=>o.date===selectedDayISO||(o.day===today&&!o.date));
     if(!todayOvs.length)return;
     const c=gcN(cid);if(!c)return;
     const permBlocks=c.schedule[today]||[];
@@ -1619,7 +1619,7 @@ function rToday(){
   //                 (b) permanent block has different staff than today's effective staff,
   //                 (c) staff is covering a client they have NO permanent blocks with at all.
   const seenSubs=new Set(); // deduplicate by "staffId|clientId"
-  getDayBlocks(today).forEach(bl=>{
+  getDayBlocks(today,selectedDayISO).forEach(bl=>{
     if(!bl.staffId||bl.isTemp)return;
     const c=gcN(bl.client.id);if(!c)return;
     const sub=gsN(bl.staffId);if(!sub)return;
@@ -1634,7 +1634,7 @@ function rToday(){
     const hasNoPermanentRole=!isPermanentForClient;
     // Also catch: block was unassigned in the permanent schedule, filled today via staff override
     const wasUnassignedFilled=bl.staffOverridden&&bl.origStaffId===null&&!permStaffId;
-    if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId)){
+    if((isDifferentFromPerm||hasNoPermanentRole||wasUnassignedFilled)&&!isStaffOut(bl.staffId,selectedDayISO)){
       const key=bl.staffId+'|'+c.id;
       if(!seenSubs.has(key)){
         seenSubs.add(key);
