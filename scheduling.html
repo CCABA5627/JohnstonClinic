@@ -1746,7 +1746,7 @@ function rToday(){
     </div>
     <div class="ss">
       <div class="sl">🚨 Staff Callout</div>
-      <select id="co-sel" style="margin-bottom:5px;"><option value="">Select staff…</option>${S.staff.map(s=>{const cos=getStaffCallout(s.id);const lbl=cos.length?cos.map(co=>' ('+coLabel(co)+')').join(''):'';return`<option value="${s.id}">${s.name}${lbl}</option>`;}).join('')}</select>
+      <select id="co-sel" style="margin-bottom:5px;"><option value="">Select staff…</option>${S.staff.map(s=>{const cos=getStaffCallout(s.id,selectedDayISO);const lbl=cos.length?cos.map(co=>' ('+coLabel(co)+')').join(''):'';return`<option value="${s.id}">${s.name}${lbl}</option>`;}).join('')}</select>
       <div style="font-size:10px;color:#888;margin-bottom:3px;">Partial time out (blank = all day)</div>
       <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
         <select id="co-from" style="flex:1;font-size:11px;padding:4px 5px;"><option value="">From…</option>${TIMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
