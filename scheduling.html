@@ -628,8 +628,9 @@ function clearClientOverride(cid,day,blockIdx){
   showToast('Override cleared — back to regular schedule',false);
 }
 
-// calledOutClients entries: {cid, date} or legacy string cid — date absent = always on
-function isClientOut(cid,forDate){const d=forDate||todayISO();return S.calledOutClients.some(co=>{const id=co.cid||co;return id===cid&&(!co.date||co.date===d);});}
+// calledOutClients entries: {cid, date, fromM?, toM?} or legacy string — fromM absent = all day
+function isClientOut(cid,forDate){const d=forDate||todayISO();return S.calledOutClients.some(co=>{const id=co.cid||co;return id===cid&&(!co.date||co.date===d)&&co.fromM===undefined;});}
+function isClientOutAt(cid,slotTime,forDate){const d=forDate||todayISO();const m=t2m(slotTime);return S.calledOutClients.some(co=>{const id=co.cid||co;if(id!==cid)return false;if(co.date&&co.date!==d)return false;if(co.fromM===undefined)return true;return m>=co.fromM&&m<co.toM;});}
 
 // calledOut entries: {sid, fromM?, toM?}  — fromM/toM in minutes; if absent = all day
 function isStaffOut(sid,forDate){const d=forDate||todayISO();return S.calledOut.some(co=>co.sid===sid&&co.fromM===undefined&&(!co.date||co.date===d));}
@@ -1415,7 +1416,8 @@ function bestForSlot(cid,day,slot,excl){const pod=S.pods[cid]||[];const res=[];p
 function todayDay(){const d=ALL_DAYS[new Date().getDay()];return DAYS.includes(d)?d:DAYS[0];}
 function go(t){S.tab=t;document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));render();}
 function fmtBlock(blk){return blk.from+(blk.from!==blk.to?' \u2013 '+blk.to:'');}
-function getDayBlocks(day,viewIso){const out=[];S.clients.forEach(c=>{if(isClientOut(c.id,viewIso||todayISO()))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
+function getDayBlocks(day,viewIso){const vd=viewIso||todayISO();const out=[];S.clients.forEach(c=>{if(isClientOut(c.id,vd))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{if(isClientOutAt(c.id,blk.from,vd))return; // partial cancel covers this block's start
+out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
 out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:isClientOut(tb.cid,viewIso||todayISO())});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
 
 function getPartialGaps(bl,day,forDate){
@@ -1474,6 +1476,7 @@ function rToday(){
   if(!S.todayFilter)S.todayFilter='all';
   const today=S.selectedDay; const realToday=todayDay();
   const selectedDayISO=isoForDay(today,S.weekOffset||0)||todayISO();
+  S.selectedDayISO=selectedDayISO; // expose for mkCO/mkClientCO
   const blocks=getDayBlocks(today,selectedDayISO);
   const todayConflicts=getConflictingStaffOnDay(today,selectedDayISO);
 
@@ -1754,7 +1757,13 @@ function rToday(){
     </div>
     <div class="ss">
       <div class="sl">📵 Client Cancellation</div>
-      <select id="client-co-sel" style="margin-bottom:6px;"><option value="">Select client…</option>${S.clients.map(c=>`<option value="${c.id}"${isClientOut(c.id)?' disabled':''}>${c.name}${isClientOut(c.id)?' (cancelled)':''}</option>`).join('')}</select>
+      <select id="client-co-sel" style="margin-bottom:5px;"><option value="">Select client…</option>${S.clients.map(c=>{const out=isClientOut(c.id,selectedDayISO);return`<option value="${c.id}"${out?' disabled':''}>${c.name}${out?' (cancelled)':''}</option>`;}).join('')}</select>
+      <div style="font-size:10px;color:#888;margin-bottom:3px;">Partial time out (blank = all day)</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
+        <select id="client-co-from" style="flex:1;font-size:11px;padding:4px 5px;"><option value="">From…</option>${TIMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+        <span style="font-size:10px;color:#888;">–</span>
+        <select id="client-co-to" style="flex:1;font-size:11px;padding:4px 5px;"><option value="">To…</option>${TIMES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      </div>
       <button class="btn" style="width:100%;background:#534AB7;color:#fff;border-color:#534AB7;" onclick="mkClientCO()">Mark Cancelled</button>
     </div>
     <div class="ss" style="border-left:3px solid #EF9F27;">
@@ -1931,15 +1940,16 @@ function mkCO(){
   const sid=sel.value;
   const fromEl=document.getElementById('co-from');const toEl=document.getElementById('co-to');
   const fromV=fromEl?.value;const toV=toEl?.value;
-  S.calledOut=S.calledOut.filter(co=>co.sid!==sid);
+  const d=S.selectedDayISO||todayISO();
+  S.calledOut=S.calledOut.filter(co=>co.sid!==sid||co.date!==d);
   const s=gsN(sid);
   const sub=askStaffCalloutSubtype(s?.name||sid);
   if(fromV&&toV&&t2m(fromV)<t2m(toV)){
-    S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV),date:todayISO()});
+    S.calledOut.push({sid,fromM:t2m(fromV),toM:t2m(toV),date:d});
     logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} out ${fromV} \u2013 ${toV}`,false);
   } else {
-    S.calledOut.push({sid,date:todayISO()});
+    S.calledOut.push({sid,date:d});
     logEvent('staff-callout',sub,sid,s?.name||sid);
     showToast(`${s?.name} marked out all day`,false);
   }
@@ -1952,7 +1962,24 @@ function logEvent(type,subtype,id,name){
 }
 function mkOut(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);S.calledOut.push({sid,date:todayISO()});const s=gsN(sid);const sub=askStaffCalloutSubtype(s?.name||sid);logEvent('staff-callout',sub,sid,s?.name||sid);markDirty();render();showToast(`${s?.name||'Staff'} marked out all day`,false);}
 function rmCO(sid){S.calledOut=S.calledOut.filter(co=>co.sid!==sid);const s=gsN(sid);markDirty();render();showToast(`${s?.name||'Staff'} marked available`,false);}
-function mkClientCO(){const sel=document.getElementById('client-co-sel');if(!sel?.value)return;const cid=sel.value;const c=gcN(cid);const sub=confirm('Who initiated this cancellation for '+( c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';if(!isClientOut(cid))S.calledOutClients.push({cid,date:todayISO()});logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();showToast(`Client cancelled — sessions removed`,false);}
+function mkClientCO(){
+  const sel=document.getElementById('client-co-sel');if(!sel?.value)return;
+  const cid=sel.value;const c=gcN(cid);
+  const fromEl=document.getElementById('client-co-from');const toEl=document.getElementById('client-co-to');
+  const fromV=fromEl?.value;const toV=toEl?.value;
+  const d=S.selectedDayISO||todayISO();
+  const sub=confirm('Who initiated this cancellation for '+(c?.name||cid)+'?\n\nOK = Client/family called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';
+  if(!isClientOut(cid,d)){
+    if(fromV&&toV&&t2m(fromV)<t2m(toV)){
+      S.calledOutClients.push({cid,date:d,fromM:t2m(fromV),toM:t2m(toV)});
+      showToast(`${c?.name||'Client'} cancelled ${fromV} – ${toV}`,false);
+    } else {
+      S.calledOutClients.push({cid,date:d});
+      showToast(`Client cancelled — sessions removed`,false);
+    }
+  }
+  logEvent('client-cancel',sub,cid,c?.name||cid);markDirty();render();
+}
 function mkClientCO2(cid){
   const c=gcN(cid);
   const sub=confirm('Who initiated this cancellation?\n\nOK = Client called out\nCancel = Clinic cancelled on them')?'client-initiated':'clinic-initiated';
