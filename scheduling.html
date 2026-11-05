@@ -1304,7 +1304,7 @@ function computePortalChanges(){
   const iso=todayISO();
   const items=[];
   // 1. Client cancellations (today only)
-  S.calledOutClients.filter(co=>{const d=co.date||iso;return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled today',sub:''});});
+  S.calledOutClients.filter(co=>{const d=co.date||iso;return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;const isPartial=co.fromM!==undefined&&co.toM!==undefined;const timeLbl=isPartial?coLabel(co):'all day';const txt=isPartial?c.name+' cancelled '+timeLbl:c.name+' cancelled today';items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:txt,sub:''});});
   // 3. Time overrides
   Object.entries(S.clientOverrides).forEach(([cid,ovList])=>{
     if(!Array.isArray(ovList))return;
@@ -1735,7 +1735,7 @@ function rToday(){
         : '<span style="font-size:10px;background:#1D9E75;color:#fff;padding:1px 8px;border-radius:10px;margin-left:6px;">&#10003; all seen</span>';
     }
     return '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:14px 16px;margin-bottom:1.25rem;">'
-      +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;display:flex;align-items:center;">Today\'s Changes'+badge+'</div>'
+      +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:10px;display:flex;align-items:center;">'+(today===realToday?'Today':today)+'\'s Changes'+badge+'</div>'
       +'<div style="display:flex;flex-direction:column;gap:6px;">'+rows+'</div>'
       +'</div>';
   })()
