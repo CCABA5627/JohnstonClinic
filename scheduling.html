@@ -1260,7 +1260,7 @@ function computeWeeklyChanges(weekOff){
 
     // 1. Client cancellations (only show on the day they are cancelled)
     if(isClientOut&&S.calledOutClients.some(co=>(!co.date&&iso===todayISO())||(co.date===iso))){
-      S.calledOutClients.filter(co=>{const d=co.date||todayISO();return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:c.name+' cancelled',sub:''});});
+      S.calledOutClients.filter(co=>{const d=co.date||todayISO();return d===iso;}).forEach(co=>{const cid=co.cid||co;const c=gcN(cid);if(!c)return;const isPartial=co.fromM!==undefined&&co.toM!==undefined;const timeLbl=isPartial?coLabel(co):'all day';const txt=isPartial?c.name+' cancelled '+timeLbl:c.name+' cancelled today';items.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:txt,sub:''});});
     }
     // 3. Time overrides for this day
     Object.entries(ovList2).forEach(([cid,ovList])=>{
@@ -1788,7 +1788,7 @@ function rToday(){
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">
         <div style="font-size:17px;font-weight:700;color:#111;">${today===realToday?'Today':'Sessions — '+today}</div>
         ${today===realToday?`<div style="font-size:12px;color:#888;">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>`:''}
-        ${today!==realToday?`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:8px;">not today</span>`:''}
+        ${today!==realToday?`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:8px;">${new Date(selectedDayISO+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>`:''}
         ${f!=='all'?`<button onclick="S.todayFilter='all';render()" style="font-size:11px;background:#f0f0f0;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;color:#555;">Clear filter ×</button>`:''}
       </div>
       ${dayPicker}
