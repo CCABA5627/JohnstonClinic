@@ -1598,7 +1598,10 @@ function rToday(){
   // 2. Client cancellations (only show for the selected day)
   S.calledOutClients.filter(co=>{const d=co.date||selectedDayISO;return d===selectedDayISO;}).forEach(co=>{
     const cid=co.cid||co;const c=gcN(cid);if(!c)return;
-    changeItems.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:'<strong>'+c.name+'</strong> cancelled today',
+    const isPartial=co.fromM!==undefined&&co.toM!==undefined;
+    const timeLbl=isPartial?coLabel(co):'all day';
+    const txt=isPartial?`<strong>${c.name}</strong> cancelled ${timeLbl}`:`<strong>${c.name}</strong> cancelled today`;
+    changeItems.push({icon:'📵',color:'#3C3489',bg:'#F0F0FE',border:'#AFA9EC',text:txt,sub:isPartial?'':'',
       undo:{type:'client-cancel',cid,label:'Restore '+c.name}});
   });
   // 3. Today-only time adjustments (client coming at different time than scheduled)
