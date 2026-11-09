@@ -785,16 +785,19 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const blockSlotsSet=new Set(slots);
     S.clients.forEach(cl=>{
       if(isClientOut(cl.id,targetDate))return;
-      getEffectiveBlocks(cl.id,day).forEach((eb,idx)=>{
+      getEffectiveBlocks(cl.id,day,targetDate).forEach((eb,idx)=>{
         if(!eb.staffId)return;
+        // Skip block entirely if client is called out for all slots in it
+        const ebSlots=slotsInBlock(eb.from,eb.to);
+        if(ebSlots.every(s=>isClientOutAt(cl.id,s,targetDate)))return;
         // Check splits too
         const assignedStaff=[];
         if(eb.splits&&eb.splits.length) eb.splits.forEach(sp=>{ if(sp.sid===sid) assignedStaff.push({from:sp.from,to:sp.to}); });
         else if(eb.staffId===sid) assignedStaff.push({from:eb.from,to:eb.to});
         assignedStaff.forEach(slot=>{
-          const slotSet=new Set(slotsInBlock(slot.from,slot.to));
+          const slotSet=new Set(slotsInBlock(slot.from,slot.to).filter(s=>!isClientOutAt(cl.id,s,targetDate)));
           const overlaps=[...slotSet].some(s=>blockSlotsSet.has(s));
-          result.push({clientName:cl.name,from:slot.from,to:slot.to,overlapsBlock:overlaps});
+          if(slotSet.size>0) result.push({clientName:cl.name,from:slot.from,to:slot.to,overlapsBlock:overlaps});
         });
       });
     });
