@@ -821,6 +821,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   const podFull=[],podPartial=[],podNone=[];
   pod.forEach(sid=>{
     const s=gsN(sid);if(!s)return;
+    if(isStaffOut(sid,targetDate))return; // skip called-out pod members entirely
     const av=getAvailSlots(sid);
     if(slots.every(sl=>av.includes(sl)))podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
     else if(av.length>=4)podPartial.push({sid,av});
@@ -832,6 +833,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   const npFull=[],npPartial=[];
   S.staff.forEach(s=>{
     if(podSet.has(s.id))return;
+    if(isStaffOut(s.id,targetDate))return; // skip called-out staff entirely
     const av=getAvailSlots(s.id);if(!av.length)return;
     const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
     const coversAll=slots.every(sl=>av.includes(sl));
@@ -1148,7 +1150,7 @@ function openTempModal(prefillDay){
 }
 function closeTempModal(){document.getElementById('temp-modal').classList.add('hidden');}
 function syncTbEnd(){const ss=document.getElementById('tb-start'),es=document.getElementById('tb-end');if(!ss||!es)return;const tgt=t2m(ss.value)+60;let best=TIMES[TIMES.length-1];TIMES.forEach(t=>{if(t2m(t)<=tgt)best=t;});es.value=best;}
-function createTempBlock(){const cid=document.getElementById('tb-client').value;const day=document.getElementById('tb-day').value;const from=document.getElementById('tb-start').value;const to=document.getElementById('tb-end').value;const label=document.getElementById('tb-label').value.trim()||'Temp block';if(t2m(to)<=t2m(from)){showToast('Finish must be after start',true);return;}const slots=slotsInBlock(from,to);const id='tb'+Date.now();const pod=S.pods[cid]||[];let bestSid=null,bestScore=-1;pod.forEach(sid=>{if(isStaffOutAt(sid,slots[0]))return;const s=gsN(sid);if(!s)return;const av=new Set(s.availability[day]||[]);if(!slots.every(sl=>av.has(sl)))return;const sc=overlap(sid,cid);if(sc>bestScore){bestScore=sc;bestSid=sid;}});S.tempBlocks.push({id,cid,day,slots,from,to,staffId:bestSid,label});markDirty();closeTempModal();render();showToast(bestSid?`Block created \u2014 assigned to ${gsN(bestSid)?.name}`:'Block created \u2014 tap it to assign staff',false);}
+function createTempBlock(){const cid=document.getElementById('tb-client').value;const day=document.getElementById('tb-day').value;const from=document.getElementById('tb-start').value;const to=document.getElementById('tb-end').value;const label=document.getElementById('tb-label').value.trim()||'Temp block';if(t2m(to)<=t2m(from)){showToast('Finish must be after start',true);return;}const slots=slotsInBlock(from,to);const id='tb'+Date.now();const pod=S.pods[cid]||[];let bestSid=null,bestScore=-1;pod.forEach(sid=>{if(isStaffOutAt(sid,slots[0]))return;const s=gsN(sid);if(!s)return;const av=new Set(s.availability[day]||[]);if(!slots.every(sl=>av.has(sl)))return;const sc=overlap(sid,cid);if(sc>bestScore){bestScore=sc;bestSid=sid;}});S.tempBlocks.push({id,cid,day,slots,from,to,staffId:bestSid,label,iso:isoForDay(day,S.weekOffset||0)||todayISO()});markDirty();closeTempModal();render();showToast(bestSid?`Block created \u2014 assigned to ${gsN(bestSid)?.name}`:'Block created \u2014 tap it to assign staff',false);}
 
 function addBlock(cid,day){const c=gcN(cid);if(!c)return;if(!c.schedule[day])c.schedule[day]=[];const existing=c.schedule[day];let defFrom='9:00 AM';if(existing.length){const last=existing[existing.length-1];const idx=TIMES.indexOf(last.to);defFrom=TIMES[Math.min(idx+1,TIMES.length-1)]||last.to;}const defToIdx=Math.min(TIMES.indexOf(defFrom)+4,TIMES.length-1);const defTo=TIMES[defToIdx]||defFrom;existing.push({from:defFrom,to:defTo,staffId:null});markDirty();render();}
 function deleteBlock(cid,day,idx){const c=gcN(cid);if(!c)return;(c.schedule[day]||[]).splice(idx,1);if(!(c.schedule[day]||[]).length)delete c.schedule[day];markDirty();render();}
@@ -1164,8 +1166,10 @@ function applyState(p){
   S.clients=p.clients||S.clients;
   S.staff=p.staff||S.staff;
   S.pods=p.pods||S.pods;
-  S.tempBlocks=p.tempBlocks||[];
   const today=todayISO();
+  // Purge temp blocks whose ISO date is in the past (keep undated legacy blocks)
+  const rawTempBlocks=p.tempBlocks||[];
+  S.tempBlocks=rawTempBlocks.filter(tb=>!tb.iso||tb.iso>=today);
   // Strip callout entries from past dates (or legacy undated entries — those were always today-only)
   const rawCalledOut=p.calledOut||[];
   const rawCalledOutClients=p.calledOutClients||[];
@@ -1932,7 +1936,7 @@ function setET(t){S.edTab=t;S.expEdit=null;S.rStart=null;render();}
 function togExp(id){S.expEdit=S.expEdit===id?null:id;if(S.expEdit!==id)S.rStart=null;render();}
 function togPod(cid,sid){if(!S.pods[cid])S.pods[cid]=[];const i=S.pods[cid].indexOf(sid);if(i>=0)S.pods[cid].splice(i,1);else S.pods[cid].push(sid);markDirty();render();}
 function togSS(sid,day,slot){const s=gsN(sid);if(!s)return;if(!s.availability[day])s.availability[day]=[];const i=s.availability[day].indexOf(slot);if(i>=0)s.availability[day].splice(i,1);else s.availability[day].push(slot);markDirty();render();}
-function togSD(sid,day){const s=gsN(sid);if(!s)return;if(!S.selDaysS[sid])S.selDaysS[sid]=new Set();const sel=S.selDaysS[sid];if(sel.has(day)){sel.delete(day);delete s.availability[day];}else{sel.add(day);if(!s.availability[day])s.availability[day]=[];}if(S.rEid===sid){S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;}markDirty();render();}
+function togSD(sid,day){const s=gsN(sid);if(!s)return;if(!S.selDaysS[sid])S.selDaysS[sid]=new Set();const sel=S.selDaysS[sid];if(sel.has(day)){sel.delete(day);delete s.availability[day];}else{sel.add(day);if(!s.availability[day]||!s.availability[day].length)s.availability[day]=[...TIMES];}if(S.rEid===sid){S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;}markDirty();render();}
 function clkST(sid,day,time){const s=gsN(sid);if(!s)return;if(!s.availability[day])s.availability[day]=[];if(S.rType==='staff'&&S.rEid===sid&&S.rStart&&S.rDay===day){const lo=Math.min(t2m(S.rStart),t2m(time));const hi=Math.max(t2m(S.rStart),t2m(time));const inR=TIMES.filter(t=>t2m(t)>=lo&&t2m(t)<=hi);const sel=new Set(s.availability[day]);inR.forEach(t=>sel.add(t));s.availability[day]=[...sel];S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;markDirty();render();}else if(S.rType==='staff'&&S.rEid===sid&&S.rStart===time&&S.rDay===day){const sel=new Set(s.availability[day]);if(sel.has(time))sel.delete(time);else sel.add(time);s.availability[day]=[...sel];S.rStart=null;S.rDay=null;S.rType=null;S.rEid=null;markDirty();render();}else{S.rStart=time;S.rDay=day;S.rType='staff';S.rEid=sid;render();}}
 function saSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[...TIMES];markDirty();render();}
 function clrSD(sid,day){const s=gsN(sid);if(!s)return;s.availability[day]=[];markDirty();render();}
