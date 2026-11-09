@@ -1181,6 +1181,8 @@ const SB_HDR={'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Co
 function applyState(p){
   S.clients=p.clients||S.clients;
   S.staff=p.staff||S.staff;
+  // Repair legacy staff availability: if a day key exists but array is empty, fill with all slots
+  S.staff.forEach(s=>{if(!s.availability)return;DAYS.forEach(d=>{if(s.availability[d]!==undefined&&s.availability[d].length===0)s.availability[d]=[...TIMES];});});
   S.pods=p.pods||S.pods;
   const today=todayISO();
   // Purge temp blocks whose ISO date is in the past (keep undated legacy blocks)
