@@ -952,8 +952,9 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block.</div>`;
     npPartial.forEach(o=>{
       const contrib=o.av.filter(sl=>slots.includes(sl));
-      console.log('RENDER npPartial',gsN(o.sid)?.name,'contrib=',contrib.length,'av=',o.av.length);
+      console.log('RENDER npPartial',gsN(o.sid)?.name,'contrib=',contrib.length,'av=',o.av.length,'sid=',o.sid);
       if(!contrib.length)return;
+      console.log('PAST contrib check for',gsN(o.sid)?.name);
       const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
       const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
       const conflictNote=o.conflict?.hasConflict
@@ -961,7 +962,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
       const note=alreadyAdded
         ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
         :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>${conflictNote}`;
-      html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');
+      console.log('calling staffRow for',gsN(o.sid)?.name,'desc=',desc);
+      try{html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');}catch(e){console.error('staffRow ERROR for',gsN(o.sid)?.name,e);}
     });
   }
 
