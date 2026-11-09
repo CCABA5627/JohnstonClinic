@@ -830,11 +830,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const s=gsN(sid);if(!s)return;
     if(isStaffOut(sid,targetDate))return; // skip called-out pod members entirely
     const av=getAvailSlots(sid);
-    const cf=chkConflict(sid,slots,cid,isTemp?-1:blockIdx,tempId||null);
-    const conflictSlots=new Set(cf.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
-    const freeSlots=av.filter(sl=>!conflictSlots.has(sl));
-    if(slots.every(sl=>av.includes(sl))&&!cf.hasConflict)podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
-    else if(freeSlots.length>=4)podPartial.push({sid,av:freeSlots});
+    if(slots.every(sl=>av.includes(sl)))podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
+    else if(av.length>=4)podPartial.push({sid,av});
     else podNone.push({sid});
   });
   podFull.sort((a,b)=>a.usedOther!==b.usedOther?(a.usedOther?1:-1):b.score-a.score);
@@ -846,12 +843,11 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     if(isStaffOut(s.id,targetDate))return; // skip called-out staff entirely
     const av=getAvailSlots(s.id);if(!av.length)return;
     const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
-    // Compute slots that are both available AND not conflicted
     const conflictSlots=new Set(conflict.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
     const freeSlots=av.filter(sl=>!conflictSlots.has(sl));
     const coversAll=slots.every(sl=>av.includes(sl))&&!conflict.hasConflict;
-    if(coversAll)npFull.push({sid:s.id,av});
-    else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots});
+    if(coversAll)npFull.push({sid:s.id,av,conflict});
+    else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots,conflict});
   });
 
   // Show current split coverage at top of modal
@@ -941,18 +937,20 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     });
   }
 
-  // 5. Non-pod — partial (≥1hr), no conflict
+  // 5. Non-pod — partial (≥1hr), with or without partial conflict
   if(npPartial.length){
     html+=`<div class="modal-section">🕐 Not in pod — partially free</div>`;
-    html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block with no conflicts.</div>`;
+    html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block.</div>`;
     npPartial.forEach(o=>{
-      const contrib=getContribSlots(o.sid);
+      const contrib=o.av.filter(sl=>slots.includes(sl));
       if(!contrib.length)return;
       const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
       const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
+      const conflictNote=o.conflict?.hasConflict
+        ?`<div style="font-size:10px;color:#D85A30;margin-top:2px;font-weight:500">⚠ Overlap: ${o.conflict.conflicts.map(x=>x.name+' '+x.from+'–'+x.to).join(', ')}</div>`:'';
       const note=alreadyAdded
         ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
-        :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>`;
+        :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>${conflictNote}`;
       html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');
     });
   }
