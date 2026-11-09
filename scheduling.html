@@ -841,12 +841,15 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   S.staff.forEach(s=>{
     if(podSet.has(s.id))return;
     if(isStaffOut(s.id,targetDate))return; // skip called-out staff entirely
-    const av=getAvailSlots(s.id);if(!av.length)return;
+    // Get staff's full day availability (not filtered to block slots)
+    const rawAvail=s.availability[day];
+    const fullDayAv=(rawAvail!==undefined&&rawAvail.length===0)?[...TIMES]:rawAvail||[];
     const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
     const conflictSlots=new Set(conflict.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
-    const freeSlots=av.filter(sl=>!conflictSlots.has(sl));
-    const coversAll=slots.every(sl=>av.includes(sl))&&!conflict.hasConflict;
-    if(coversAll)npFull.push({sid:s.id,av,conflict});
+    // Free slots = full day availability minus conflicted times, intersected with block slots
+    const freeSlots=slots.filter(sl=>fullDayAv.includes(sl)&&!conflictSlots.has(sl));
+    const coversAll=slots.every(sl=>fullDayAv.includes(sl))&&!conflict.hasConflict;
+    if(coversAll)npFull.push({sid:s.id,av:slots,conflict});
     else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots,conflict});
   });
 
