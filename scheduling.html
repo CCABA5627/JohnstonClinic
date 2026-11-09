@@ -830,8 +830,11 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const s=gsN(sid);if(!s)return;
     if(isStaffOut(sid,targetDate))return; // skip called-out pod members entirely
     const av=getAvailSlots(sid);
-    if(slots.every(sl=>av.includes(sl)))podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
-    else if(av.length>=4)podPartial.push({sid,av});
+    const cf=chkConflict(sid,slots,cid,isTemp?-1:blockIdx,tempId||null);
+    const conflictSlots=new Set(cf.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
+    const freeSlots=av.filter(sl=>!conflictSlots.has(sl));
+    if(slots.every(sl=>av.includes(sl))&&!cf.hasConflict)podFull.push({sid,score:overlap(sid,cid),usedOther:usedOther.has(sid)});
+    else if(freeSlots.length>=4)podPartial.push({sid,av:freeSlots});
     else podNone.push({sid});
   });
   podFull.sort((a,b)=>a.usedOther!==b.usedOther?(a.usedOther?1:-1):b.score-a.score);
@@ -843,9 +846,12 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     if(isStaffOut(s.id,targetDate))return; // skip called-out staff entirely
     const av=getAvailSlots(s.id);if(!av.length)return;
     const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
-    const coversAll=slots.every(sl=>av.includes(sl));
-    if(coversAll&&!conflict.hasConflict)npFull.push({sid:s.id,av});
-    else if(!coversAll&&av.length>=4&&!conflict.hasConflict)npPartial.push({sid:s.id,av});
+    // Compute slots that are both available AND not conflicted
+    const conflictSlots=new Set(conflict.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
+    const freeSlots=av.filter(sl=>!conflictSlots.has(sl));
+    const coversAll=slots.every(sl=>av.includes(sl))&&!conflict.hasConflict;
+    if(coversAll)npFull.push({sid:s.id,av});
+    else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots});
   });
 
   // Show current split coverage at top of modal
