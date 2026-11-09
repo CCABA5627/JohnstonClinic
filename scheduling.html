@@ -849,6 +849,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     // Free slots = full day availability minus conflicted times, intersected with block slots
     const freeSlots=slots.filter(sl=>fullDayAv.includes(sl)&&!conflictSlots.has(sl));
     const coversAll=slots.every(sl=>fullDayAv.includes(sl))&&!conflict.hasConflict;
+    console.log('NP check',s.name,'day=',day,'rawAvail=',JSON.stringify(rawAvail),'fullDayAv.length=',fullDayAv.length,'slots.length=',slots.length,'freeSlots.length=',freeSlots.length,'coversAll=',coversAll,'conflict=',conflict.hasConflict);
     if(coversAll)npFull.push({sid:s.id,av:slots,conflict});
     else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots,conflict});
   });
