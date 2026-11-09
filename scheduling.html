@@ -680,7 +680,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
         if(blk.staffId!==sid)return;
         if(cl.id===excCid&&idx===excBlockIdx)return;
         const ov=slotsInBlock(blk.from,blk.to).filter(s=>ns.has(s));
-        if(ov.length>0)conflicts.push({name:cl.name,from:blk.from,to:blk.to});
+        if(ov.length>0)conflicts.push({name:cl.name,from:blk.from,to:blk.to,ovFrom:ov[0],ovTo:ov[ov.length-1]});
       });
     });
     (S.tempBlocks||[]).forEach(tb=>{
@@ -845,7 +845,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     const rawAvail=s.availability[day];
     const fullDayAv=(rawAvail!==undefined&&rawAvail.length===0)?[...TIMES]:rawAvail||[];
     const conflict=chkConflict(s.id,slots,cid,isTemp?-1:blockIdx,tempId||null);
-    const conflictSlots=new Set(conflict.conflicts.flatMap(x=>slotsInBlock(x.from,x.to)));
+    // Use only the overlapping portion of each conflict (not the full conflicting block)
+    const conflictSlots=new Set(conflict.conflicts.flatMap(x=>slotsInBlock(x.ovFrom||x.from,x.ovTo||x.to)));
     // Free slots = full day availability minus conflicted times, intersected with block slots
     const freeSlots=slots.filter(sl=>fullDayAv.includes(sl)&&!conflictSlots.has(sl));
     const coversAll=slots.every(sl=>fullDayAv.includes(sl))&&!conflict.hasConflict;
@@ -951,7 +952,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
       const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
       const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
       const conflictNote=o.conflict?.hasConflict
-        ?`<div style="font-size:10px;color:#D85A30;margin-top:2px;font-weight:500">⚠ Overlap: ${o.conflict.conflicts.map(x=>x.name+' '+x.from+'–'+x.to).join(', ')}</div>`:'';
+        ?`<div style="font-size:10px;color:#D85A30;margin-top:2px;font-weight:500">⚠ Overlap: ${o.conflict.conflicts.map(x=>x.name+' '+(x.ovFrom||x.from)+'–'+(x.ovTo||x.to)).join(', ')}</div>`:'';
       const note=alreadyAdded
         ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
         :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>${conflictNote}`;
