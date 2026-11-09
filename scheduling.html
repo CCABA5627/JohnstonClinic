@@ -653,7 +653,7 @@ function coLabel(co){
 
 window._BM={};
 function regBlock(key,data){window._BM[key]=data;return key;}
-function openBlock(key){const d=window._BM[key];if(d)openAssignModal(d.cid,d.day,d.blockIdx,d.isTemp,d.tempId);}
+function openBlock(key){const d=window._BM[key];if(d)openAssignModal(d.cid,d.day,d.blockIdx,d.isTemp,d.tempId,d.targetDate||null);}
 
 function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   const c=gcN(cid);let blockFrom,blockTo,currentSid,slots,blk;
@@ -740,12 +740,19 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
 
   // How many of the block's slots does this staff member's availability cover?
   function getAvailSlots(sid){
-    const av=new Set(gsN(sid)?.availability[day]||[]);
+    const s=gsN(sid);if(!s)return[];
+    const raw=s.availability[day];
+    // If the day key exists but array is empty, treat as full day (legacy data from day-toggle bug)
+    const avArr=(raw!==undefined&&raw.length===0)?[...TIMES]:raw||[];
+    const av=new Set(avArr);
     return slots.filter(sl=>av.has(sl));
   }
   // What portion of the REMAINING uncovered slots can this staff fill?
   function getContribSlots(sid){
-    const av=new Set(gsN(sid)?.availability[day]||[]);
+    const s=gsN(sid);if(!s)return[];
+    const raw=s.availability[day];
+    const avArr=(raw!==undefined&&raw.length===0)?[...TIMES]:raw||[];
+    const av=new Set(avArr);
     const pool=remainingSlots.length?remainingSlots:slots;
     return pool.filter(sl=>av.has(sl));
   }
@@ -1139,6 +1146,15 @@ function renderAssignModalBody(cid,day,blockIdx,tempId,blk,targetDate){
   openAssignModal(cid,day,blockIdx,blk?.isTemp||!!tempId,tempId,targetDate);
 }
 function deleteTempBlock(id){S.tempBlocks=S.tempBlocks.filter(t=>t.id!==id);markDirty();closeModal();render();}
+function skipBlockForDay(cid,day,blockIdx,iso){
+  // Add a date-scoped staff override that sets staffId to null — effectively hides block for that day only
+  if(!confirm('Remove this session for '+iso+' only? The permanent schedule is unchanged.'))return;
+  if(!S.staffOverrides[cid])S.staffOverrides[cid]=[];
+  // Remove any existing override for this block+date then add skip marker
+  S.staffOverrides[cid]=S.staffOverrides[cid].filter(o=>!(o.blockIdx===blockIdx&&o.day===day&&o.date===iso));
+  S.staffOverrides[cid].push({blockIdx,day,staffId:'__skip__',date:iso});
+  markDirty();render();
+}
 
 function openTempModal(prefillDay){
   const dayOpts=DAYS.map(d=>`<option value="${d}"${d===(prefillDay||S.selectedDay||todayDay())?'selected':''}>${d}</option>`).join('');
@@ -1421,7 +1437,8 @@ function todayDay(){const d=ALL_DAYS[new Date().getDay()];return DAYS.includes(d
 function go(t){S.tab=t;document.querySelectorAll('.nav-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));render();}
 function fmtBlock(blk){return blk.from+(blk.from!==blk.to?' \u2013 '+blk.to:'');}
 function getDayBlocks(day,viewIso){const vd=viewIso||todayISO();const out=[];S.clients.forEach(c=>{if(isClientOut(c.id,vd))return;getEffectiveBlocks(c.id,day,viewIso).forEach((blk,idx)=>{if(isClientOutAt(c.id,blk.from,vd))return; // partial cancel covers this block's start
-out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
+if(blk.staffId==='__skip__')return; // day-only skip via weekly X button
+out.push({client:c,from:blk.from,to:blk.to,staffId:blk.staffId,splits:blk.splits||null,isTemp:false,blockIdx:idx,overridden:blk._overridden||false,staffOverridden:blk._staffOverridden||false,origStaffId:blk._origStaffId||null});});});(S.tempBlocks||[]).filter(tb=>tb.day===day&&(!tb.iso||tb.iso===vd)).forEach(tb=>{const c=gcN(tb.cid);if(!c)return;// Show temp blocks even if client is cancelled — temp block IS the replacement session
 out.push({client:c,from:tb.from,to:tb.to,staffId:tb.staffId,splits:tb.splits||null,isTemp:true,tempId:tb.id,label:tb.label,slots:tb.slots,clientCancelled:isClientOut(tb.cid,viewIso||todayISO())});});out.sort((a,b)=>t2m(a.from)-t2m(b.from));return out;}
 
 function getPartialGaps(bl,day,forDate){
@@ -1849,8 +1866,8 @@ function rWeek(){
       else{sname=gsN(bl.staffId)?.name||'?';}
       const overrideLine=bl.overridden?`<div class="wsb-gap">📅 Today only: ${bl.from}–${bl.to}</div>`:'';
       const gapLine=gaps?`<div class="wsb-gap">⏱ ${gaps}</div>`:'';
-      const bkey=regBlock('w_'+bl.client.id+'_'+d+'_'+bl.from.replace(/ /g,'')+(bl.isTemp?bl.tempId:bl.blockIdx),{cid:bl.client.id,day:d,blockIdx:bl.blockIdx??-1,isTemp:!!bl.isTemp,tempId:bl.tempId||null});
-      const delBtn=bl.isTemp?`<button class="wsb-del" onclick="event.stopPropagation();deleteTempBlock('${bl.tempId}')" title="Delete block">✕</button>`:`<button class="wsb-del" onclick="event.stopPropagation();deleteBlock('${bl.client.id}','${d}',${bl.blockIdx})" title="Delete block">✕</button>`;
+      const bkey=regBlock('w_'+bl.client.id+'_'+d+'_'+bl.from.replace(/ /g,'')+(bl.isTemp?bl.tempId:bl.blockIdx),{cid:bl.client.id,day:d,blockIdx:bl.blockIdx??-1,isTemp:!!bl.isTemp,tempId:bl.tempId||null,targetDate:dayIso});
+      const delBtn=bl.isTemp?`<button class="wsb-del" onclick="event.stopPropagation();deleteTempBlock('${bl.tempId}')" title="Remove temp block">✕</button>`:`<button class="wsb-del" onclick="event.stopPropagation();skipBlockForDay('${bl.client.id}','${d}',${bl.blockIdx},'${dayIso}')" title="Skip for this day only">✕</button>`;
       return`<div class="wsl"><div class="wsb ${cls}" onclick="openBlock('${bkey}')"><div class="wsb-info"><div class="wsb-time">${fmtBlock(bl)}${bl.isTemp?' • TEMP':''}</div><div class="wsb-client">${bl.client.name}</div><div class="wsb-staff">${sname}</div>${overrideLine}${gapLine}</div>${delBtn}</div></div>`;
     }).join('');
     return`<div class="wdc" style="${isToday?'border-color:#7F77DD':''}"><div class="wdh" style="${isToday?'background:#EEEDFE;color:#3C3489':''}"><span>${d} <span style="font-size:10px;color:${isToday?'#7F77DD':'#aaa'};font-weight:400">${dateStr}</span>${isToday?' <span style="font-size:9px;background:#7F77DD;color:#fff;padding:1px 5px;border-radius:8px;margin-left:3px">Today</span>':''}</span><span style="font-size:9px;color:#888;margin-left:4px">${blocks.length}</span><button class="btn btn-sm" style="margin-left:auto;font-size:10px;background:#E6F1FB;color:#0C447C;border-color:#85B7EB" onclick="openTempModal('${d}')">+ Temp</button></div>${inner}</div>`;
