@@ -675,7 +675,9 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   function chkConflict(sid,newSlots,excCid,excBlockIdx,excTempId){
     const conflicts=[];const ns=new Set(newSlots);
     S.clients.forEach(cl=>{
-      if(isClientOut(cl.id,targetDate))return;
+      const co=isClientOut(cl.id,targetDate);
+      console.log('chkConflict client',cl.name,'isClientOut=',co,'targetDate=',targetDate);
+      if(co)return;
       getEffectiveBlocks(cl.id,day,targetDate).forEach((blk,idx)=>{
         if(blk.staffId!==sid)return;
         if(cl.id===excCid&&idx===excBlockIdx)return;
