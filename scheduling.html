@@ -679,7 +679,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
       getEffectiveBlocks(cl.id,day,targetDate).forEach((blk,idx)=>{
         if(blk.staffId!==sid)return;
         if(cl.id===excCid&&idx===excBlockIdx)return;
-        const ov=slotsInBlock(blk.from,blk.to).filter(s=>ns.has(s));
+        // Only count slots where the client is actually present (not partially called out)
+        const ov=slotsInBlock(blk.from,blk.to).filter(s=>ns.has(s)&&!isClientOutAt(cl.id,s,targetDate));
         if(ov.length>0)conflicts.push({name:cl.name,from:blk.from,to:blk.to,ovFrom:ov[0],ovTo:ov[ov.length-1]});
       });
     });
