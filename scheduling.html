@@ -952,6 +952,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block.</div>`;
     npPartial.forEach(o=>{
       const contrib=o.av.filter(sl=>slots.includes(sl));
+      console.log('RENDER npPartial',gsN(o.sid)?.name,'contrib=',contrib.length,'av=',o.av.length);
       if(!contrib.length)return;
       const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
       const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
