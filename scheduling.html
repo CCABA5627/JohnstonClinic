@@ -675,15 +675,21 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   function chkConflict(sid,newSlots,excCid,excBlockIdx,excTempId){
     const conflicts=[];const ns=new Set(newSlots);
     S.clients.forEach(cl=>{
-      const co=isClientOut(cl.id,targetDate);
-      console.log('chkConflict client',cl.name,'isClientOut=',co,'targetDate=',targetDate);
-      if(co)return;
+      if(isClientOut(cl.id,targetDate))return;
       getEffectiveBlocks(cl.id,day,targetDate).forEach((blk,idx)=>{
         if(blk.staffId!==sid)return;
         if(cl.id===excCid&&idx===excBlockIdx)return;
+        // Skip block entirely if client is called out for all slots in the block
+        const blkSlots=slotsInBlock(blk.from,blk.to);
+        if(blkSlots.every(s=>isClientOutAt(cl.id,s,targetDate)))return;
         // Only count slots where the client is actually present (not partially called out)
-        const ov=slotsInBlock(blk.from,blk.to).filter(s=>ns.has(s)&&!isClientOutAt(cl.id,s,targetDate));
-        if(ov.length>0)conflicts.push({name:cl.name,from:blk.from,to:blk.to,ovFrom:ov[0],ovTo:ov[ov.length-1]});
+        const ov=blkSlots.filter(s=>ns.has(s)&&!isClientOutAt(cl.id,s,targetDate));
+        if(ov.length>0){
+          // ovTo should be end time (slot after last), not last slot itself
+          const ovToIdx=TIMES.indexOf(ov[ov.length-1]);
+          const ovToEnd=TIMES[ovToIdx+1]||ov[ov.length-1];
+          conflicts.push({name:cl.name,from:blk.from,to:blk.to,ovFrom:ov[0],ovTo:ovToEnd});
+        }
       });
     });
     (S.tempBlocks||[]).forEach(tb=>{
@@ -853,9 +859,8 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
     // Free slots = full day availability minus conflicted times, intersected with block slots
     const freeSlots=slots.filter(sl=>fullDayAv.includes(sl)&&!conflictSlots.has(sl));
     const coversAll=slots.every(sl=>fullDayAv.includes(sl))&&!conflict.hasConflict;
-    console.log('NP check',s.name,'day=',day,'rawAvail=',JSON.stringify(rawAvail),'fullDayAv.length=',fullDayAv.length,'slots.length=',slots.length,'freeSlots.length=',freeSlots.length,'coversAll=',coversAll,'conflict=',conflict.hasConflict);
     if(coversAll)npFull.push({sid:s.id,av:slots,conflict});
-    else if(freeSlots.length>=4){console.log('PUSHING to npPartial:',s.name,'freeSlots=',freeSlots.length);npPartial.push({sid:s.id,av:freeSlots,conflict});}
+    else if(freeSlots.length>=4)npPartial.push({sid:s.id,av:freeSlots,conflict});
   });
 
   // Show current split coverage at top of modal
@@ -946,15 +951,12 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
   }
 
   // 5. Non-pod — partial (≥1hr), with or without partial conflict
-  console.log('npPartial array:',npPartial.map(o=>gsN(o.sid)?.name));
   if(npPartial.length){
     html+=`<div class="modal-section">🕐 Not in pod — partially free</div>`;
     html+=`<div style="font-size:10px;color:#888;margin-bottom:6px;padding:4px 8px;background:#FFF8EC;border-radius:6px;border:1px solid #FAC775;">Available for part of this block.</div>`;
     npPartial.forEach(o=>{
       const contrib=o.av.filter(sl=>slots.includes(sl));
-      console.log('RENDER npPartial',gsN(o.sid)?.name,'contrib=',contrib.length,'av=',o.av.length,'sid=',o.sid);
       if(!contrib.length)return;
-      console.log('PAST contrib check for',gsN(o.sid)?.name);
       const alreadyAdded=splits&&splits.some(sp=>sp.sid===o.sid);
       const desc=alreadyAdded?'✓ Already added':descContrib(contrib)||'Partial';
       const conflictNote=o.conflict?.hasConflict
@@ -962,8 +964,7 @@ function openAssignModal(cid,day,blockIdx,isTemp,tempId,targetDate){
       const note=alreadyAdded
         ?`<div style="font-size:10px;color:#1D9E75;margin-top:2px;font-weight:600">Already in coverage</div>`
         :`<div style="font-size:10px;color:#EF9F27;margin-top:2px">Doesn't cover full block</div>${conflictNote}`;
-      console.log('calling staffRow for',gsN(o.sid)?.name,'desc=',desc);
-      try{html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');}catch(e){console.error('staffRow ERROR for',gsN(o.sid)?.name,e);}
+      html+=staffRow(o.sid,desc,alreadyAdded,false,note,null,'partial');
     });
   }
 
